@@ -1,8 +1,8 @@
 'use client';
 
-import './styles/globals.css';
-import { WalletProvider } from './@aawallet-sdk';
-import { EChain } from './@aawallet-sdk/types';
+import '@styles/globals.css';
+import { WalletProvider } from '@aawallet-sdk';
+import { EChain } from '@aawallet-sdk/types';
 
 export default function RootLayout({
   children,

@@ -33,11 +33,15 @@ export const certificatedLogoUri = (uri: string): string => {
   return uri;
 };
 
-export const parseTokenValue = (amount: string, decimals: number): bigint => {
+export const parseTokenValue = (amount: string, decimals: number): string => {
   const separator = amount.indexOf('.') !== -1 ? '.' : ',';
   const [integer, fraction] = amount.split(separator);
   const integerPart = BigInt(integer);
   const fractionPart = BigInt(fraction || '0');
+
+  if (!fraction) {
+    return (integerPart * BigInt(10 ** decimals)).toString();
+  }
 
   if (fraction.length > decimals) {
     throw new Error('Too many decimal places');
@@ -45,16 +49,17 @@ export const parseTokenValue = (amount: string, decimals: number): bigint => {
 
   const fractionMultiplier = BigInt(10 ** (decimals - fraction.length));
   return (
-    integerPart * BigInt(10 ** decimals) + fractionPart * fractionMultiplier
-  );
+    integerPart * BigInt(10 ** decimals) +
+    fractionPart * fractionMultiplier
+  ).toString();
 };
 
 export const parseReadableAmount = (
-  value: bigint,
+  value: string,
   decimals: number
 ): string => {
-  const integer = value / BigInt(10 ** decimals);
-  const fraction = value % BigInt(10 ** decimals);
+  const integer = BigInt(value) / BigInt(10 ** decimals);
+  const fraction = BigInt(value) % BigInt(10 ** decimals);
 
   if (fraction === BigInt(0)) {
     return integer.toString();

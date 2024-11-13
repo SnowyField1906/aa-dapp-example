@@ -1,5 +1,3 @@
-'use client';
-
 import { computePoolAddress, Pool } from '@uniswap/v3-sdk';
 import { TradeType, Percent } from '@uniswap/sdk-core';
 
@@ -14,11 +12,13 @@ import {
 import { Contract } from 'ethers';
 import {
   AlphaRouter,
+  AlphaRouterParams,
   CurrencyAmount,
   SwapOptionsSwapRouter02,
   SwapRoute,
   SwapType,
 } from '@uniswap/smart-order-router';
+
 export const getPoolList = async (): Promise<PoolIdentifier[]> => {
   return [];
 };
@@ -45,38 +45,13 @@ export const getPoolInfo = async (params: PoolIdentifier): Promise<Pool> => {
   );
 };
 
-export const generateRoute = (
+export const generateRouterExactInput = async (
   tokenPair: Pair<OnchainToken>,
   valuePair: Pair<bigint | null>,
-  recipient: Address,
-  tradeType: TradeType
+  router: AlphaRouter,
+  options: SwapOptionsSwapRouter02
 ): Promise<SwapRoute | null> => {
-  switch (tradeType) {
-    case TradeType.EXACT_INPUT:
-      return _generateRouterExactInput(tokenPair, valuePair, recipient);
-    case TradeType.EXACT_OUTPUT:
-      return _generateRouterExactOutput(tokenPair, valuePair, recipient);
-  }
-};
-
-const _generateRouterExactInput = async (
-  tokenPair: Pair<OnchainToken>,
-  valuePair: Pair<bigint | null>,
-  recipient: Address
-): Promise<SwapRoute | null> => {
-  const router = new AlphaRouter({
-    chainId: CHAIN_ID,
-    provider: PROVIDER,
-  });
-
-  const options: SwapOptionsSwapRouter02 = {
-    recipient,
-    slippageTolerance: new Percent(50, 10_000),
-    deadline: Math.floor(Date.now() / 1000 + 1800),
-    type: SwapType.SWAP_ROUTER_02,
-  };
-
-  const route = await router.route(
+  return router.route(
     CurrencyAmount.fromRawAmount(
       tokenPair[InputType.BASE],
       valuePair[InputType.BASE]!.toString()
@@ -85,28 +60,15 @@ const _generateRouterExactInput = async (
     TradeType.EXACT_INPUT,
     options
   );
-
-  return route;
 };
 
-const _generateRouterExactOutput = async (
+export const generateRouterExactOutput = async (
   tokenPair: Pair<OnchainToken>,
   valuePair: Pair<bigint | null>,
-  recipient: Address
+  router: AlphaRouter,
+  options: SwapOptionsSwapRouter02
 ): Promise<SwapRoute | null> => {
-  const router = new AlphaRouter({
-    chainId: CHAIN_ID,
-    provider: PROVIDER,
-  });
-
-  const options: SwapOptionsSwapRouter02 = {
-    recipient,
-    slippageTolerance: new Percent(50, 10_000),
-    deadline: Math.floor(Date.now() / 1000 + 1800),
-    type: SwapType.SWAP_ROUTER_02,
-  };
-
-  const route = await router.route(
+  return router.route(
     CurrencyAmount.fromRawAmount(
       tokenPair[InputType.QUOTE],
       valuePair[InputType.QUOTE]!.toString()
@@ -115,6 +77,4 @@ const _generateRouterExactOutput = async (
     TradeType.EXACT_OUTPUT,
     options
   );
-
-  return route;
 };

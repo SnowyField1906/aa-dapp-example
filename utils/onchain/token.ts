@@ -10,7 +10,7 @@ export const getBalance = async (
 ): Promise<string> => {
   const contract = new ethers.Contract(
     tokenAddress,
-    ['function balanceOf(address) returns (uint256)'],
+    ['function balanceOf(address) view returns (uint256)'],
     PROVIDER
   );
   const balance = await contract.balanceOf(userAddress);

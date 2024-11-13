@@ -2,17 +2,17 @@
 
 import { ChangeEvent, useEffect, useState } from 'react';
 import { FaCog, FaExchangeAlt } from 'react-icons/fa';
-import { InputType, OffChainToken, Pair } from '../utils/types';
+import { InputType, OffChainToken, Pair } from '@utils/types';
 import TokenInput from './TokenInput';
 import { Pool } from '@uniswap/v3-sdk';
-import { generateRoute, getPoolInfo } from '../utils/onchain/uniswap';
 import {
   parseOnChainToken,
   parseOnChainTokenPair,
-} from '../utils/offchain/tokens';
-import { useWalletContext } from '../@aawallet-sdk';
+} from '@utils/offchain/tokens';
+import { useWalletContext } from '@aawallet-sdk';
 import { CurrencyAmount, SwapRoute } from '@uniswap/smart-order-router';
 import { TradeType } from '@uniswap/sdk-core';
+import { BASE_URL } from '@utils/constants';
 
 const Swap = ({ tokenList }: { tokenList: OffChainToken[] }) => {
   const { userWallet } = useWalletContext();
@@ -22,13 +22,16 @@ const Swap = ({ tokenList }: { tokenList: OffChainToken[] }) => {
   const [selectedTokenPair, setSelectedTokenPair] = useState<
     Pair<OffChainToken | null>
   >({ [InputType.BASE]: null, [InputType.QUOTE]: null });
-  const [inputValuePair, setInputValuePair] = useState<Pair<bigint | null>>({
+  const [inputValuePair, setInputValuePair] = useState<Pair<string | null>>({
     [InputType.BASE]: null,
     [InputType.QUOTE]: null,
   });
 
   const tokenPairFilled =
-    selectedTokenPair[InputType.BASE] && selectedTokenPair[InputType.QUOTE];
+    selectedTokenPair[InputType.BASE] &&
+    selectedTokenPair[InputType.QUOTE] &&
+    (inputValuePair[InputType.BASE] !== null ||
+      inputValuePair[InputType.QUOTE] !== null);
 
   const handleFlipOrder = () => {
     setSelectedTokenPair({
@@ -42,21 +45,33 @@ const Swap = ({ tokenList }: { tokenList: OffChainToken[] }) => {
   };
 
   // Exact Input Swap: Call when [quoteSelectedToken, baseInputValue] changes
+  console.log({ tokenPairFilled, routeComputationLoading });
   useEffect(() => {
     (async () => {
-      if (tokenPairFilled) {
+      console.log('Exact Input Swap');
+      if (tokenPairFilled && !routeComputationLoading) {
+        console.log('Start Exact Input Swap');
         setRouteComputationLoading(true);
-        const route: SwapRoute | null = await generateRoute(
-          parseOnChainTokenPair(selectedTokenPair as Pair<OffChainToken>),
-          inputValuePair,
-          userWallet!.address,
-          TradeType.EXACT_INPUT
-        );
-        console.log('Exact Input Swap Route: ', route);
-        setInputValuePair({
-          ...inputValuePair,
-          [InputType.QUOTE]: BigInt(route!.quote.toExact()),
+        const res = await fetch(`${BASE_URL}/api/uniswap-route`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            tokenPair: selectedTokenPair,
+            valuePair: inputValuePair,
+            recipient: userWallet!.address,
+            tradeType: TradeType.EXACT_INPUT,
+          }),
         });
+        const route: SwapRoute = await res.json();
+        console.log('Exact Input Swap Route: ', route);
+
+        setInputValuePair((prev) => ({
+          ...prev,
+          [InputType.QUOTE]: route!.quote.toExact(),
+        }));
+        setRouteComputationLoading(false);
       }
     })();
   }, [selectedTokenPair[InputType.QUOTE], inputValuePair[InputType.BASE]]);
@@ -64,18 +79,30 @@ const Swap = ({ tokenList }: { tokenList: OffChainToken[] }) => {
   // Exact Output Swap: Call when [baseSelectedToken, quoteInputValue] changes
   useEffect(() => {
     (async () => {
-      if (tokenPairFilled) {
-        const route: SwapRoute | null = await generateRoute(
-          parseOnChainTokenPair(selectedTokenPair as Pair<OffChainToken>),
-          inputValuePair,
-          userWallet!.address,
-          TradeType.EXACT_OUTPUT
-        );
-        console.log('Exact Output Swap Route: ', route);
-        setInputValuePair({
-          ...inputValuePair,
-          [InputType.BASE]: BigInt(route!.quote.toExact()),
+      console.log('Exact Output Swap');
+      if (tokenPairFilled && !routeComputationLoading) {
+        console.log('Start Exact Output Swap');
+        setRouteComputationLoading(true);
+        const res = await fetch(`${BASE_URL}/api/uniswap-route`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            tokenPair: selectedTokenPair,
+            valuePair: inputValuePair,
+            recipient: userWallet!.address,
+            tradeType: TradeType.EXACT_OUTPUT,
+          }),
         });
+        const route: SwapRoute = await res.json();
+        console.log('Exact Output Swap Route: ', route);
+
+        setInputValuePair((prev) => ({
+          ...prev,
+          [InputType.BASE]: route!.quote.toExact(),
+        }));
+        setRouteComputationLoading(false);
       }
     })();
   }, [selectedTokenPair[InputType.BASE], inputValuePair[InputType.QUOTE]]);
@@ -118,7 +145,10 @@ const Swap = ({ tokenList }: { tokenList: OffChainToken[] }) => {
         </div>
         <div className="flex justify-between">
           <span className="text-gray-400">Rate</span>
-          <span className="text-white">3.6198 BRWL per WAX</span>
+          <span className="text-white">
+            3.6198 {selectedTokenPair[InputType.BASE]?.symbol} per{' '}
+            {selectedTokenPair[InputType.QUOTE]?.symbol}
+          </span>
         </div>
         <div className="flex justify-between">
           <span className="text-gray-400">Price Impact</span>

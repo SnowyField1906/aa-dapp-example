@@ -2,10 +2,10 @@
 
 import React, { useState, useEffect } from 'react';
 
-import { useWalletContext } from './@aawallet-sdk';
-import { OffChainToken } from './utils/types';
-import { getTokenList } from './utils/offchain/tokens';
-import Swap from './components/Swap';
+import { useWalletContext } from '@aawallet-sdk';
+import { OffChainToken } from '@utils/types';
+import { getTokenList } from '@utils/offchain/tokens';
+import Swap from '@components/Swap';
 
 const App = () => {
   const [tokenList, setTokenList] = useState<OffChainToken[]>([]);
@@ -27,9 +27,11 @@ const App = () => {
         <div className="flex gap-6">
           {userWallet ? (
             <>
-              <p className="text-white">{userWallet.address}</p>
+              <button className="text-white py-2 px-5 bg-gray-800 rounded-full hover:bg-gray-700">
+                {userWallet.address}
+              </button>
               <button
-                className="text-white py-2 px-5 bg-gray-800 rounded-lg"
+                className="text-white py-2 px-5 bg-gray-800 rounded-full hover:bg-gray-700"
                 onClick={logout}
               >
                 Logout
@@ -37,7 +39,7 @@ const App = () => {
             </>
           ) : (
             <button
-              className="text-white py-2 px-5 bg-gray-800 rounded-lg"
+              className="text-white py-2 px-5 bg-gray-800 rounded-full hover:bg-gray-700"
               onClick={login}
             >
               Login

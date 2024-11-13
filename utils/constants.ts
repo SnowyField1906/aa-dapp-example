@@ -1,6 +1,8 @@
 import { ethers } from 'ethers';
 import { Address } from './types';
 
+export const BASE_URL = 'http://localhost:4000';
+
 export const PROVIDER = new ethers.providers.JsonRpcProvider(
   'https://eth-sepolia.api.onfinality.io/public'
 );

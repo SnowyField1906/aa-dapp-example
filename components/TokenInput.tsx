@@ -1,14 +1,20 @@
 'use client';
 
-import { ChangeEvent, Dispatch, useEffect, useState } from 'react';
-import { InputType, OffChainToken, Pair } from '../utils/types';
+import {
+  ChangeEvent,
+  Dispatch,
+  SetStateAction,
+  useEffect,
+  useState,
+} from 'react';
+import { InputType, OffChainToken, Pair } from '@utils/types';
 import {
   certificatedLogoUri,
   parseReadableAmount,
   parseTokenValue,
-} from '../utils/offchain/tokens';
-import { getBalance } from '../utils/onchain/token';
-import { useWalletContext } from '../@aawallet-sdk';
+} from '@utils/offchain/tokens';
+import { getBalance } from '@utils/onchain/token';
+import { useWalletContext } from '@aawallet-sdk';
 
 const TokenInput = ({
   tokenList,
@@ -20,9 +26,9 @@ const TokenInput = ({
 }: {
   tokenList: OffChainToken[];
   selectedTokenPair: Pair<OffChainToken | null>;
-  setSelectedTokenPair: Dispatch<Pair<OffChainToken | null>>;
-  inputValuePair: Pair<bigint | null>;
-  setInputValuePair: Dispatch<Pair<bigint | null>>;
+  setSelectedTokenPair: Dispatch<SetStateAction<Pair<OffChainToken | null>>>;
+  inputValuePair: Pair<string | null>;
+  setInputValuePair: Dispatch<SetStateAction<Pair<string | null>>>;
   inputType: InputType;
 }) => {
   const { userWallet } = useWalletContext();
@@ -45,9 +51,9 @@ const TokenInput = ({
         blurAmount,
         selectedTokenPair[inputType]!.decimals
       );
-      setInputValuePair({ ...inputValuePair, [inputType]: value });
+      setInputValuePair((prev) => ({ ...prev, [inputType]: value }));
     } else {
-      setInputValuePair({ ...inputValuePair, [inputType]: null });
+      setInputValuePair((prev) => ({ ...prev, [inputType]: null }));
       setBlurAmount('');
     }
   };
