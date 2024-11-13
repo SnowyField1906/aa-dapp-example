@@ -10,6 +10,7 @@ import {
 import { InputType, OffChainToken, Pair } from '@utils/types';
 import {
   certificatedLogoUri,
+  getTokenFiatPrice,
   parseReadableAmount,
   parseTokenValue,
 } from '@utils/offchain/tokens';
@@ -36,6 +37,7 @@ const TokenInput = ({
   const [isDropdownOpen, setDropdownOpen] = useState<boolean>(false);
   const [blurAmount, setBlurAmount] = useState<string>('');
   const [balance, setBalance] = useState<string>('');
+  const [fiatPrice, setFiatPrice] = useState<string>('');
 
   const handleTokenChange = (selected: OffChainToken) => {
     const token = tokenList.find((t) => t.symbol === selected.symbol);
@@ -59,17 +61,24 @@ const TokenInput = ({
   };
 
   useEffect(() => {
-    (async () => {
+    const updateAmountAndPrice = async () => {
       if (inputValuePair[inputType] && selectedTokenPair[inputType]) {
         let readableAmount = parseReadableAmount(
           inputValuePair[inputType],
           selectedTokenPair[inputType].decimals
         );
         setBlurAmount(readableAmount);
+        let fiatPrice = await getTokenFiatPrice(
+          selectedTokenPair[inputType].symbol,
+          readableAmount
+        );
+        setFiatPrice(fiatPrice);
       } else {
         setBlurAmount('');
       }
+    };
 
+    const updateBalance = async () => {
       if (userWallet && selectedTokenPair[inputType]) {
         let balance = await getBalance(
           selectedTokenPair[inputType].address,
@@ -77,7 +86,9 @@ const TokenInput = ({
         );
         setBalance(balance);
       }
-    })();
+    };
+
+    Promise.all([updateAmountAndPrice(), updateBalance()]);
   }, [inputValuePair[inputType], selectedTokenPair[inputType], userWallet]);
 
   return (
@@ -123,7 +134,7 @@ const TokenInput = ({
             placeholder={selectedTokenPair[inputType] ? '0.00' : 'select token'}
             className="bg-transparent text-2xl text-right w-full focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
           />
-          <div className="text-right text-gray-400 text-xs">${'usdValue'}</div>
+          <div className="text-right text-gray-400 text-xs">${fiatPrice}</div>
         </div>
       </div>
 

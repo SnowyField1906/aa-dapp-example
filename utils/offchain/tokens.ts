@@ -65,7 +65,36 @@ export const parseReadableAmount = (
     return integer.toString();
   }
 
-  const fractionStr = fraction.toString();
-  const trimmedFraction = fractionStr.replace(/0+$/, '');
-  return `${integer}.${trimmedFraction}`;
+  const trimmedFraction = fraction.toString().replace(/0+$/, '');
+  const readableAmount = `${integer}.${trimmedFraction}`;
+  return truncateDecimals(readableAmount, 6);
+};
+
+export const truncateDecimals = (
+  readableAmount: string,
+  decimals: number
+): string => {
+  const [integer, fraction] = readableAmount.split('.');
+  if (!fraction) {
+    return integer;
+  }
+  return `${integer}.${fraction.slice(0, decimals)}`;
+};
+
+export const getTokenFiatPrice = async (
+  symbol: string,
+  readableInputAmount: string
+): Promise<string> => {
+  try {
+    const response = await fetch(
+      `https://api.coinbase.com/v2/prices/${symbol}-USD/spot`
+    );
+    let data = await response.json();
+    let fiatPrice: string = data.data.amount;
+    let total: number = parseFloat(readableInputAmount) * parseFloat(fiatPrice);
+    return truncateDecimals(total.toString(), 6);
+  } catch (error) {
+    console.error('Error fetching price:', error);
+    return '0';
+  }
 };
