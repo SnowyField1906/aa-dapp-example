@@ -1,14 +1,20 @@
 'use client';
 
 import { createContext, useContext, ReactNode } from 'react';
-import useWallet, { EChain } from '../hooks/useWallet';
+import useWallet from '../hooks/useWallet';
+import { EChain } from '../types';
 
 type WalletContextType = ReturnType<typeof useWallet> | null;
-
 const WalletContext = createContext<WalletContextType>(null);
 
-export const WalletProvider = ({ children }: { children: ReactNode }) => {
-  const wallet = useWallet(EChain.ETHEREUM);
+export const WalletProvider = ({
+  children,
+  chain,
+}: {
+  children: ReactNode;
+  chain: EChain;
+}) => {
+  const wallet = useWallet(chain);
 
   return (
     <WalletContext.Provider value={wallet}>{children}</WalletContext.Provider>

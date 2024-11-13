@@ -3,22 +3,12 @@
 import React, { useState, useEffect } from 'react';
 import { ethers, JsonRpcProvider } from 'ethers';
 
-import {
-  ETHEREUM_RPC_URL,
-  ETHEREUM_CONTRACT_ADDRESS,
-  ETHEREUM_ABI,
-} from './utils/miscs';
-import useWallet, { EChain } from './hooks/useWallet';
-import { useWalletContext } from './components/WalletProvider';
+import { useWalletContext } from './@aawallet-sdk';
+import { OffChainToken } from './utils/types';
+import { getTokenList } from './utils/offchain/tokens';
 
 const App = () => {
-  const [ethCount, setEthCount] = useState<number>();
-  const provider = new JsonRpcProvider(ETHEREUM_RPC_URL);
-  const contract = new ethers.Contract(
-    ETHEREUM_CONTRACT_ADDRESS,
-    ETHEREUM_ABI,
-    provider
-  );
+  const [tokenList, setTokenList] = useState<OffChainToken[]>([]);
 
   const {
     userWallet,
@@ -30,26 +20,13 @@ const App = () => {
     transferNative,
   } = useWalletContext();
 
-  const pingEthereum = async () => {
-    await sendTransaction({
-      contractAddress: ETHEREUM_CONTRACT_ADDRESS,
-      gasLimit: '100000',
-      value: '0',
-      abi: ETHEREUM_ABI,
-      functionFragment: 'ping',
-      functionArguments: [],
-    });
-    const count = await contract.getPingCount(userWallet!.address);
-    setEthCount(Number(count));
-  };
-
   useEffect(() => {
     (async () => {
-      if (!userWallet) return;
-      const count = await contract.getPingCount(userWallet.address);
-      setEthCount(Number(count));
+      const tokenList: OffChainToken[] = await getTokenList();
+      console.log(tokenList);
+      setTokenList(tokenList);
     })();
-  }, [userWallet, transactionResult]);
+  }, []);
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
@@ -71,29 +48,6 @@ const App = () => {
           Login
         </button>
       )}
-
-      <div className="grid grid-cols-2 gap-4 place-items-center mt-20">
-        <div
-          className={
-            userWallet?.chain === 'ETHEREUM'
-              ? 'opacity-100 place-items-center'
-              : 'opacity-50 place-items-center'
-          }
-        >
-          <h2 className="text-2xl text-black font-bold text-center mb-2">
-            Ethereum
-          </h2>
-          <button
-            onClick={pingEthereum}
-            className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-700 transition duration-200"
-          >
-            Ping
-          </button>
-          <p className="text-black text-center">
-            Count: {ethCount === undefined ? 'N/A' : ethCount}
-          </p>
-        </div>
-      </div>
     </div>
   );
 };

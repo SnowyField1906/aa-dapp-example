@@ -1,8 +1,8 @@
 'use client';
 
-import type { Metadata } from 'next';
-import './css/globals.css';
-import { WalletProvider } from './components/WalletProvider';
+import './styles/globals.css';
+import { WalletProvider } from './@aawallet-sdk';
+import { EChain } from './@aawallet-sdk/types';
 
 export default function RootLayout({
   children,
@@ -12,7 +12,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <WalletProvider>{children}</WalletProvider>
+        <WalletProvider chain={EChain.ETHEREUM}>{children}</WalletProvider>
       </body>
     </html>
   );

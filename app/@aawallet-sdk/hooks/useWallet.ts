@@ -1,57 +1,14 @@
-import { useState, useEffect, useCallback } from 'react';
-import { ethers, TransactionReceipt } from 'ethers';
-import { TransactionResponse } from '@solana/web3.js';
-import { AnchorProvider, Program } from '@coral-xyz/anchor';
+import { useState, useCallback } from 'react';
+import {
+  EChain,
+  PublicUserWallet,
+  TransactionPayload,
+  TransactionResult,
+  TransferNativePayload,
+  TransferTokenPayload,
+} from '../types';
 
 const TARGET_WALLET = 'http://localhost:3000/transaction_signing';
-
-export enum EChain {
-  ETHEREUM = 'ETHEREUM',
-  SOLANA = 'SOLANA',
-}
-
-export type EthereumTransactionPayload = {
-  contractAddress: string;
-  gasLimit: string;
-  value: string;
-  abi: any;
-  functionFragment: string;
-  functionArguments: string[];
-};
-export type SolanaTransactionPayload = {
-  programId: string;
-  instruction: string;
-  idl: string;
-};
-export type TransactionPayload<T extends EChain> = T extends EChain.ETHEREUM
-  ? EthereumTransactionPayload
-  : T extends EChain.SOLANA
-  ? SolanaTransactionPayload
-  : never;
-
-export type TransferNativePayload = {
-  recipient: string;
-  amount: string;
-};
-export type TransferTokenPayload = {
-  recipient: string;
-  amount: string;
-  tokenAddress: string;
-};
-
-export type TransactionResult<T extends EChain> = {
-  success: boolean;
-  receipt?: T extends EChain.ETHEREUM
-    ? TransactionReceipt
-    : T extends EChain.SOLANA
-    ? TransactionResponse
-    : never;
-};
-
-export type PublicUserWallet<T extends EChain> = {
-  address: string;
-  chain: T;
-};
 
 const useWallet = (chain: EChain) => {
   const [userWallet, setUserWallet] =
