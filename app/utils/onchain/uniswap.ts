@@ -1,22 +1,120 @@
-import { Token } from '@uniswap/sdk-core';
-import { computePoolAddress } from '@uniswap/v3-sdk';
-import { FACTORY_ADDRESS, I_POOL_ABI, PROVIDER } from '../constants';
-import { Address, OffChainToken } from '../types';
-import { Contract } from 'ethers';
+'use client';
 
-export const getPoolAddress = (
-  t0: OffChainToken,
-  t1: OffChainToken,
-  fee: number
-): string => {
-  return computePoolAddress({
-    factoryAddress: FACTORY_ADDRESS,
-    tokenA: new Token(t0.chainId, t0.address, t0.decimals, t0.symbol, t0.name),
-    tokenB: new Token(t1.chainId, t1.address, t1.decimals, t1.symbol, t1.name),
-    fee,
-  });
+import { computePoolAddress, Pool } from '@uniswap/v3-sdk';
+import { TradeType, Percent } from '@uniswap/sdk-core';
+
+import { CHAIN_ID, FACTORY_ADDRESS, I_POOL_ABI, PROVIDER } from '../constants';
+import {
+  Address,
+  InputType,
+  OnchainToken,
+  Pair,
+  PoolIdentifier,
+} from '../types';
+import { Contract } from 'ethers';
+import {
+  AlphaRouter,
+  CurrencyAmount,
+  SwapOptionsSwapRouter02,
+  SwapRoute,
+  SwapType,
+} from '@uniswap/smart-order-router';
+export const getPoolList = async (): Promise<PoolIdentifier[]> => {
+  return [];
 };
 
-export const getPoolContract = (poolAddress: Address): Contract => {
-  return new Contract(poolAddress, I_POOL_ABI.abi, PROVIDER);
+export const getPoolInfo = async (params: PoolIdentifier): Promise<Pool> => {
+  let poolAddress = computePoolAddress({
+    ...params,
+    factoryAddress: FACTORY_ADDRESS,
+  });
+  let poolContract = new Contract(poolAddress, I_POOL_ABI.abi, PROVIDER);
+
+  const [liquidity, slot0] = await Promise.all([
+    poolContract.liquidity(),
+    poolContract.slot0(),
+  ]);
+
+  return new Pool(
+    params.tokenA,
+    params.tokenB,
+    params.fee,
+    slot0[0].toString(),
+    liquidity.toString(),
+    slot0[1]
+  );
+};
+
+export const generateRoute = (
+  tokenPair: Pair<OnchainToken>,
+  valuePair: Pair<bigint | null>,
+  recipient: Address,
+  tradeType: TradeType
+): Promise<SwapRoute | null> => {
+  switch (tradeType) {
+    case TradeType.EXACT_INPUT:
+      return _generateRouterExactInput(tokenPair, valuePair, recipient);
+    case TradeType.EXACT_OUTPUT:
+      return _generateRouterExactOutput(tokenPair, valuePair, recipient);
+  }
+};
+
+const _generateRouterExactInput = async (
+  tokenPair: Pair<OnchainToken>,
+  valuePair: Pair<bigint | null>,
+  recipient: Address
+): Promise<SwapRoute | null> => {
+  const router = new AlphaRouter({
+    chainId: CHAIN_ID,
+    provider: PROVIDER,
+  });
+
+  const options: SwapOptionsSwapRouter02 = {
+    recipient,
+    slippageTolerance: new Percent(50, 10_000),
+    deadline: Math.floor(Date.now() / 1000 + 1800),
+    type: SwapType.SWAP_ROUTER_02,
+  };
+
+  const route = await router.route(
+    CurrencyAmount.fromRawAmount(
+      tokenPair[InputType.BASE],
+      valuePair[InputType.BASE]!.toString()
+    ),
+    tokenPair[InputType.QUOTE],
+    TradeType.EXACT_INPUT,
+    options
+  );
+
+  return route;
+};
+
+const _generateRouterExactOutput = async (
+  tokenPair: Pair<OnchainToken>,
+  valuePair: Pair<bigint | null>,
+  recipient: Address
+): Promise<SwapRoute | null> => {
+  const router = new AlphaRouter({
+    chainId: CHAIN_ID,
+    provider: PROVIDER,
+  });
+
+  const options: SwapOptionsSwapRouter02 = {
+    recipient,
+    slippageTolerance: new Percent(50, 10_000),
+    deadline: Math.floor(Date.now() / 1000 + 1800),
+    type: SwapType.SWAP_ROUTER_02,
+  };
+
+  const route = await router.route(
+    CurrencyAmount.fromRawAmount(
+      tokenPair[InputType.QUOTE],
+      valuePair[InputType.QUOTE]!.toString()
+    ),
+    tokenPair[InputType.BASE],
+    TradeType.EXACT_OUTPUT,
+    options
+  );
+
+  return route;
 };

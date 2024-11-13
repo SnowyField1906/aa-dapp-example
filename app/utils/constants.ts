@@ -1,8 +1,7 @@
-import { JsonRpcProvider } from 'ethers';
+import { ethers } from 'ethers';
 import { Address } from './types';
-const url = 'https://eth-sepolia.api.onfinality.io/public';
 
-export const PROVIDER = new JsonRpcProvider(
+export const PROVIDER = new ethers.providers.JsonRpcProvider(
   'https://eth-sepolia.api.onfinality.io/public'
 );
 export const CHAIN_ID = 11155111;

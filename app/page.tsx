@@ -1,24 +1,16 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { ethers, JsonRpcProvider } from 'ethers';
 
 import { useWalletContext } from './@aawallet-sdk';
 import { OffChainToken } from './utils/types';
 import { getTokenList } from './utils/offchain/tokens';
+import Swap from './components/Swap';
 
 const App = () => {
   const [tokenList, setTokenList] = useState<OffChainToken[]>([]);
 
-  const {
-    userWallet,
-    transactionResult,
-    login,
-    logout,
-    sendTransaction,
-    transferToken,
-    transferNative,
-  } = useWalletContext();
+  const { userWallet, login, logout } = useWalletContext();
 
   useEffect(() => {
     (async () => {
@@ -29,25 +21,33 @@ const App = () => {
   }, []);
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
-      <h1 className="text-4xl text-black font-bold text-center mb-6">
-        Ping Counter for wallet {userWallet?.address}
-      </h1>
-      {userWallet ? (
-        <button
-          onClick={logout}
-          className="px-6 py-3 bg-red-500 text-white rounded-lg hover:bg-red-700 transition duration-200"
-        >
-          Logout
-        </button>
-      ) : (
-        <button
-          onClick={login}
-          className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-700 transition duration-200"
-        >
-          Login
-        </button>
-      )}
+    <div className="min-h-screen bg-gray-950">
+      <div className="h-16 w-full flex items-center justify-between px-6">
+        <div className="text-white text-lg">AAWallet Demo</div>
+        <div className="flex gap-6">
+          {userWallet ? (
+            <>
+              <p className="text-white">{userWallet.address}</p>
+              <button
+                className="text-white py-2 px-5 bg-gray-800 rounded-lg"
+                onClick={logout}
+              >
+                Logout
+              </button>
+            </>
+          ) : (
+            <button
+              className="text-white py-2 px-5 bg-gray-800 rounded-lg"
+              onClick={login}
+            >
+              Login
+            </button>
+          )}
+        </div>
+      </div>
+      <div className="flex flex-col items-center gap-6 mt-6">
+        <Swap tokenList={tokenList} />
+      </div>
     </div>
   );
 };

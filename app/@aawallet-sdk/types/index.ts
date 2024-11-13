@@ -1,5 +1,5 @@
 import { TransactionResponse } from '@solana/web3.js';
-import { TransactionReceipt } from 'ethers';
+import { Transaction } from 'ethers';
 
 export enum EChain {
   ETHEREUM = 'ETHEREUM',
@@ -38,7 +38,7 @@ export type TransferTokenPayload = {
 export type TransactionResult<T extends EChain> = {
   success: boolean;
   receipt?: T extends EChain.ETHEREUM
-    ? TransactionReceipt
+    ? Transaction
     : T extends EChain.SOLANA
     ? TransactionResponse
     : never;
