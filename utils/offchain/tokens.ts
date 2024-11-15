@@ -3,15 +3,18 @@
 import { CHAIN_ID } from '../constants';
 import { InputType, OffChainToken, OnchainToken, Pair } from '../types';
 import { Token } from '@uniswap/sdk-core';
+import defaultTokenList from '@uniswap/default-token-list';
+import additionalTokenList from './additional_token_list.json';
 
 export const getTokenList = async (
   chainId: number = CHAIN_ID
 ): Promise<OffChainToken[]> => {
-  const response = await fetch('https://ipfs.io/ipns/tokens.uniswap.org');
-  const tokenList = await response.json();
-  return tokenList.tokens.filter(
-    (token: OffChainToken) => token.chainId === chainId
+  //   const response = await fetch('https://ipfs.io/ipns/tokens.uniswap.org');
+  //   const tokenList = await response.json();
+  const filtered = defaultTokenList.tokens.filter(
+    (token) => token.chainId === chainId
   );
+  return [...filtered, ...additionalTokenList];
 };
 
 export const parseOnChainToken = (t: OffChainToken): OnchainToken => {
@@ -34,6 +37,8 @@ export const certificatedLogoUri = (uri: string): string => {
 };
 
 export const parseTokenValue = (amount: string, decimals: number): string => {
+  if (amount === '') throw new Error('Empty value');
+
   const separator = amount.indexOf('.') !== -1 ? '.' : ',';
   const [integer, fraction] = amount.split(separator);
   const integerPart = BigInt(integer);
@@ -42,7 +47,6 @@ export const parseTokenValue = (amount: string, decimals: number): string => {
   if (!fraction) {
     return (integerPart * BigInt(10 ** decimals)).toString();
   }
-
   if (fraction.length > decimals) {
     throw new Error('Too many decimal places');
   }
@@ -58,6 +62,8 @@ export const parseReadableAmount = (
   value: string,
   decimals: number
 ): string => {
+  if (value === '') throw new Error('Empty value');
+
   const integer = BigInt(value) / BigInt(10 ** decimals);
   const fraction = BigInt(value) % BigInt(10 ** decimals);
 
@@ -65,7 +71,11 @@ export const parseReadableAmount = (
     return integer.toString();
   }
 
-  const trimmedFraction = fraction.toString().replace(/0+$/, '');
+  const padStarts = decimals - fraction.toString().length + 1;
+  const trimmedFraction = fraction
+    .toString()
+    .replace(/0+$/, '')
+    .padStart(padStarts, '0');
   const readableAmount = `${integer}.${trimmedFraction}`;
   return truncateDecimals(readableAmount, 6);
 };

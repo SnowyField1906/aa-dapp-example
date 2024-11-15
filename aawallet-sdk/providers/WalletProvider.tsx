@@ -5,21 +5,8 @@ import useWallet from '../hooks/useWallet';
 import { EChain } from '../types';
 
 type WalletContextType = ReturnType<typeof useWallet> | null;
+
 const WalletContext = createContext<WalletContextType>(null);
-
-export const WalletProvider = ({
-  children,
-  chain,
-}: {
-  children: ReactNode;
-  chain: EChain;
-}) => {
-  const wallet = useWallet(chain);
-
-  return (
-    <WalletContext.Provider value={wallet}>{children}</WalletContext.Provider>
-  );
-};
 
 export const useWalletContext = () => {
   const context = useContext(WalletContext);
@@ -28,3 +15,18 @@ export const useWalletContext = () => {
   }
   return context;
 };
+
+const WalletProvider = ({
+  children,
+  chain,
+}: {
+  children: ReactNode;
+  chain: EChain;
+}) => {
+  const wallet = useWallet(chain);
+  return (
+    <WalletContext.Provider value={wallet}>{children}</WalletContext.Provider>
+  );
+};
+
+export default WalletProvider;

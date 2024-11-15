@@ -8,17 +8,7 @@ import { getTokenList } from '@utils/offchain/tokens';
 import Swap from '@components/Swap';
 
 const App = () => {
-  const [tokenList, setTokenList] = useState<OffChainToken[]>([]);
-
   const { userWallet, login, logout } = useWalletContext();
-
-  useEffect(() => {
-    (async () => {
-      const tokenList: OffChainToken[] = await getTokenList();
-      console.log(tokenList);
-      setTokenList(tokenList);
-    })();
-  }, []);
 
   return (
     <div className="min-h-screen bg-gray-950">
@@ -48,7 +38,7 @@ const App = () => {
         </div>
       </div>
       <div className="flex flex-col items-center gap-6 mt-6">
-        <Swap tokenList={tokenList} />
+        <Swap />
       </div>
     </div>
   );

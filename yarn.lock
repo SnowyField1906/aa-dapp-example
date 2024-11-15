@@ -3598,6 +3598,11 @@
   resolved "https://registry.yarnpkg.com/@uniswap/default-token-list/-/default-token-list-11.19.0.tgz#12d4e40f6c79f794d3e3a71e2d4d9784fb6c967b"
   integrity sha512-H/YLpxeZUrzT4Ki8mi4k5UiadREiLHg7WUqCv0Qt/VkOjX2mIBhrxCj1Wh61/J7lK0XqOjksfpm6RG1+YErPoQ==
 
+"@uniswap/default-token-list@^12.25.0":
+  version "12.25.0"
+  resolved "https://registry.yarnpkg.com/@uniswap/default-token-list/-/default-token-list-12.25.0.tgz#cbd5610842de735c38a46ddd0a41852ffe70a73a"
+  integrity sha512-XDG47o8u7B8jZdsZSiLZwHFCPAY3OAkAhhGVwTteo2AEZ5+LIyDle6AUZw6TJxVgwExH9VRr2moRh3+7wqIDhA==
+
 "@uniswap/lib@^4.0.1-alpha":
   version "4.0.1-alpha"
   resolved "https://registry.yarnpkg.com/@uniswap/lib/-/lib-4.0.1-alpha.tgz#2881008e55f075344675b3bca93f020b028fbd02"
@@ -3837,7 +3842,18 @@
     "@uniswap/v3-core" "1.0.0"
     "@uniswap/v3-periphery" "^1.0.1"
 
-"@uniswap/v4-sdk@^1.10.0", "@uniswap/v4-sdk@^1.10.3", "@uniswap/v4-sdk@^1.2.0", "@uniswap/v4-sdk@^1.6.3":
+"@uniswap/v4-sdk@^1.10.0":
+  version "1.11.2"
+  resolved "https://registry.yarnpkg.com/@uniswap/v4-sdk/-/v4-sdk-1.11.2.tgz#ce0b76ae67bb9f34a7046aa25aecb05d9afb1004"
+  integrity sha512-vrAHv13J7LdAsqBkYEkaChc9D3tY9vsEd0YbUwLraC6AUCYGxb2sCEyg+tse5RDicDd0aqiEwyq8OHnCI1R3aQ==
+  dependencies:
+    "@ethersproject/solidity" "^5.0.9"
+    "@uniswap/sdk-core" "^5.3.1"
+    "@uniswap/v3-sdk" "3.12.0"
+    tiny-invariant "^1.1.0"
+    tiny-warning "^1.0.3"
+
+"@uniswap/v4-sdk@^1.10.3", "@uniswap/v4-sdk@^1.2.0", "@uniswap/v4-sdk@^1.6.3":
   version "1.11.1"
   resolved "https://registry.yarnpkg.com/@uniswap/v4-sdk/-/v4-sdk-1.11.1.tgz#46ba6f414fd1e6fee57213b83c4110ee1a02f581"
   integrity sha512-ddtIVXtqkP4lKxfTcb3QVQX4Cp6oweHKm5gXj6CZIKIJkHgpR4XUjgWM3m7vsviL/No9fsBCPIqtvJ77VLFJSw==

@@ -1,119 +1,74 @@
 'use client';
 
-import {
-  ChangeEvent,
-  Dispatch,
-  SetStateAction,
-  useEffect,
-  useState,
-} from 'react';
+import { useEffect, useState } from 'react';
 import { InputType, OffChainToken, Pair } from '@utils/types';
 import {
   certificatedLogoUri,
-  getTokenFiatPrice,
   parseReadableAmount,
-  parseTokenValue,
 } from '@utils/offchain/tokens';
-import { getBalance } from '@utils/onchain/token';
 import { useWalletContext } from '@aawallet-sdk';
+import { useStaticSwapContext } from '@providers/StaticSwapProvider';
 
-const TokenInput = ({
-  tokenList,
-  selectedTokenPair,
-  setSelectedTokenPair,
-  inputValuePair,
-  setInputValuePair,
-  inputType,
-}: {
-  tokenList: OffChainToken[];
-  selectedTokenPair: Pair<OffChainToken | null>;
-  setSelectedTokenPair: Dispatch<SetStateAction<Pair<OffChainToken | null>>>;
-  inputValuePair: Pair<string | null>;
-  setInputValuePair: Dispatch<SetStateAction<Pair<string | null>>>;
-  inputType: InputType;
-}) => {
+const TokenInput = ({ input }: { input: InputType }) => {
   const { userWallet } = useWalletContext();
+  const {
+    tokenList,
+    getReadableAmount,
+    selectedTokenPair,
+    balancePair,
+    fiatPricePair,
+    inputValuePair,
+    onSwapLoadingPair,
+    handleUpdateToken,
+    handleUpdateBalance,
+    handleUpdateFiatPrice,
+    handleUpdateInputValue,
+  } = useStaticSwapContext();
 
   const [isDropdownOpen, setDropdownOpen] = useState<boolean>(false);
-  const [blurAmount, setBlurAmount] = useState<string>('');
-  const [balance, setBalance] = useState<string>('');
-  const [fiatPrice, setFiatPrice] = useState<string>('');
+  const [tempAmount, setTempAmount] = useState<string>('');
 
   const handleTokenChange = (selected: OffChainToken) => {
-    const token = tokenList.find((t) => t.symbol === selected.symbol);
-    setSelectedTokenPair({ ...selectedTokenPair, [inputType]: token });
+    handleUpdateToken(input, selected);
     setDropdownOpen(false);
   };
-  const handleAmountChange = (e: ChangeEvent<HTMLInputElement>) => {
-    setBlurAmount(e.target.value);
-  };
-  const handleUpdateValue = () => {
-    if (blurAmount) {
-      let value = parseTokenValue(
-        blurAmount,
-        selectedTokenPair[inputType]!.decimals
-      );
-      setInputValuePair((prev) => ({ ...prev, [inputType]: value }));
-    } else {
-      setInputValuePair((prev) => ({ ...prev, [inputType]: null }));
-      setBlurAmount('');
-    }
+  const handleOnBlur = () => {
+    handleUpdateInputValue(input, tempAmount);
   };
 
   useEffect(() => {
-    const updateAmountAndPrice = async () => {
-      if (inputValuePair[inputType] && selectedTokenPair[inputType]) {
-        let readableAmount = parseReadableAmount(
-          inputValuePair[inputType],
-          selectedTokenPair[inputType].decimals
-        );
-        setBlurAmount(readableAmount);
-        let fiatPrice = await getTokenFiatPrice(
-          selectedTokenPair[inputType].symbol,
-          readableAmount
-        );
-        setFiatPrice(fiatPrice);
-      } else {
-        setBlurAmount('');
-      }
-    };
+    let readableAmount = getReadableAmount(input);
+    setTempAmount(readableAmount);
 
-    const updateBalance = async () => {
-      if (userWallet && selectedTokenPair[inputType]) {
-        let balance = await getBalance(
-          selectedTokenPair[inputType].address,
-          userWallet.address
-        );
-        setBalance(balance);
-      }
-    };
-
-    Promise.all([updateAmountAndPrice(), updateBalance()]);
-  }, [inputValuePair[inputType], selectedTokenPair[inputType], userWallet]);
+    Promise.all([
+      readableAmount && handleUpdateFiatPrice(input, readableAmount),
+      userWallet && handleUpdateBalance(input, userWallet.address),
+    ]);
+  }, [inputValuePair[input], selectedTokenPair[input], userWallet]);
 
   return (
-    <div className="bg-gray-950 p-3 rounded-lg shadow-md select-none">
+    <div className="bg-gray-950 p-3 rounded-lg shadow-md select-none w-full">
       <div className="flex justify-between items-center mb-2">
-        <span className="text-sm text-gray-400">{inputType}</span>
+        <span className="text-sm text-gray-400">{input}</span>
         <span className="text-gray-400 text-xs cursor-pointer">
-          Balance: {balance === '' ? '...' : balance}
+          Balance: {balancePair[input] ?? '...'}
         </span>
       </div>
 
-      <div className="flex items-center rounded-lg mb-2">
+      <div className="flex items-center justify-between rounded-lg mb-2 w-full">
         <div
           className="flex items-center justify-between cursor-pointer p-3 rounded-lg mr-4 bg-gray-900"
           onClick={() => setDropdownOpen(!isDropdownOpen)}
         >
-          {selectedTokenPair[inputType] ? (
+          {selectedTokenPair[input] ? (
             <>
               <img
-                src={certificatedLogoUri(selectedTokenPair[inputType].logoURI)}
-                alt={selectedTokenPair[inputType].symbol}
-                className="w-6 h-6 mr-2"
+                src={certificatedLogoUri(selectedTokenPair[input].logoURI)}
+                alt={selectedTokenPair[input].symbol}
+                className="w-6 h-6 mr-2 rounded-full"
               />
               <span className="text-sm font-medium">
-                {selectedTokenPair[inputType].symbol}
+                {selectedTokenPair[input].symbol}
               </span>
             </>
           ) : (
@@ -124,17 +79,19 @@ const TokenInput = ({
           <span className="ml-2 text-gray-400">▼</span>
         </div>
 
-        <div className="flex-1">
+        <div className={onSwapLoadingPair[input] ? 'animate-pulse' : ''}>
           <input
             type="text"
-            value={selectedTokenPair[inputType] ? blurAmount : 'select token'}
-            disabled={!selectedTokenPair[inputType]}
-            onChange={handleAmountChange}
-            onBlur={handleUpdateValue}
-            placeholder={selectedTokenPair[inputType] ? '0.00' : 'select token'}
+            value={selectedTokenPair[input] ? tempAmount : 'select token'}
+            disabled={!selectedTokenPair[input] || onSwapLoadingPair[input]}
+            onChange={(e) => setTempAmount(e.target.value)}
+            onBlur={handleOnBlur}
+            placeholder={selectedTokenPair[input] ? '0.00' : 'select token'}
             className="bg-transparent text-2xl text-right w-full focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
           />
-          <div className="text-right text-gray-400 text-xs">${fiatPrice}</div>
+          <div className="text-right text-gray-400 text-xs">
+            ${fiatPricePair[input]}
+          </div>
         </div>
       </div>
 
@@ -149,7 +106,7 @@ const TokenInput = ({
               <img
                 src={certificatedLogoUri(token.logoURI)}
                 alt={token.symbol}
-                className="w-6 h-6 mr-2"
+                className="w-6 h-6 mr-2 rounded-full"
               />
               <span className="text-sm font-medium">{token.symbol}</span>
             </div>

@@ -12,3 +12,5 @@ export const ROUTER_ADDRESS: Address =
 export const FACTORY_ADDRESS: Address =
   '0x0227628f3F023bb0B980b67D528571c95c6DaC1c';
 export { default as I_POOL_ABI } from '@uniswap/v3-core/artifacts/contracts/interfaces/IUniswapV3Pool.sol/IUniswapV3Pool.json';
+
+export const UNISWAP_FEES = [500, 3000, 10000];
