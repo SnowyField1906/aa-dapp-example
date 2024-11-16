@@ -51,7 +51,13 @@ const TokenInput = ({ input }: { input: InputType }) => {
       <div className="flex justify-between items-center mb-2">
         <span className="text-sm text-gray-400">{input}</span>
         <span className="text-gray-400 text-xs cursor-pointer">
-          Balance: {balancePair[input] ?? '...'}
+          Balance:{' '}
+          {balancePair[input]
+            ? parseReadableAmount(
+                balancePair[input],
+                selectedTokenPair[input]!.decimals
+              )
+            : '..'}
         </span>
       </div>
 

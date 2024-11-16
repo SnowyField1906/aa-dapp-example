@@ -1,45 +1,22 @@
-import { computePoolAddress, Pool, Route } from '@uniswap/v3-sdk';
-import { TradeType, Percent } from '@uniswap/sdk-core';
+import { computePoolAddress, Pool } from '@uniswap/v3-sdk';
 
-import {
-  CHAIN_ID,
-  FACTORY_ADDRESS,
-  I_POOL_ABI,
-  PROVIDER,
-  UNISWAP_FEES,
-} from '../constants';
-import {
-  Address,
-  InputType,
-  OffChainToken,
-  OnchainToken,
-  Pair,
-  PoolIdentifier,
-  UniswapStaticSwapRequest,
-  UniswapStaticSwapResponse,
-} from '../types';
+import { FACTORY_ADDRESS, I_POOL_ABI, PROVIDER } from '../constants';
+import { PoolIdentifier } from '../types';
 import { Contract } from 'ethers';
-import {
-  AlphaRouter,
-  AlphaRouterParams,
-  CurrencyAmount,
-  SwapOptionsSwapRouter02,
-  SwapRoute,
-  SwapType,
-} from '@uniswap/smart-order-router';
-import { getCombinations } from '@utils/offchain/arithmetics';
-import { parseOnChainToken } from '@utils/offchain/tokens';
 
 export const getPoolList = async (): Promise<PoolIdentifier[]> => {
   return [];
 };
 
-export const getPoolInfo = async (params: PoolIdentifier): Promise<Pool> => {
-  let poolAddress = computePoolAddress({
+export const getPoolAddress = (params: PoolIdentifier): string => {
+  return computePoolAddress({
     ...params,
     factoryAddress: FACTORY_ADDRESS,
   });
-  let poolContract = new Contract(poolAddress, I_POOL_ABI.abi, PROVIDER);
+};
+export const getPoolInfo = async (params: PoolIdentifier): Promise<Pool> => {
+  let poolAddress = getPoolAddress(params);
+  let poolContract = new Contract(poolAddress, I_POOL_ABI, PROVIDER);
 
   const [liquidity, slot0] = await Promise.all([
     poolContract.liquidity(),
@@ -54,39 +31,6 @@ export const getPoolInfo = async (params: PoolIdentifier): Promise<Pool> => {
     liquidity.toString(),
     slot0[1]
   );
-};
-
-export const staticSwap = async (
-  tokenPair: Pair<OnchainToken>,
-  valuePair: Pair<string | null>,
-  tradeType: TradeType
-): Promise<UniswapStaticSwapResponse> => {
-  let searchParams: UniswapStaticSwapRequest = {
-    protocols: 'v2,v3,mixed',
-    tokenInAddress: tokenPair[InputType.BASE].address,
-    tokenInChainId: tokenPair[InputType.BASE].chainId,
-    tokenOutAddress: tokenPair[InputType.QUOTE].address,
-    tokenOutChainId: tokenPair[InputType.QUOTE].chainId,
-    type: tradeType === TradeType.EXACT_INPUT ? 'exactIn' : 'exactOut',
-    amount:
-      valuePair[
-        tradeType === TradeType.EXACT_INPUT ? InputType.BASE : InputType.QUOTE
-      ]!.toString(),
-  };
-
-  let response = await fetch(
-    `https://api.uniswap.org/v1/quote?${new URLSearchParams(
-      searchParams as any
-    )}`,
-    {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    }
-  );
-  let data = await response.json();
-  return data;
 };
 
 /*

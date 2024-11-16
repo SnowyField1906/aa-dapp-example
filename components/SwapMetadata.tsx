@@ -1,9 +1,21 @@
 import { useStaticSwapContext } from '@providers/StaticSwapProvider';
+import { TradeType } from '@uniswap/sdk-core';
 import { allFilled } from '@utils/offchain/base';
-import { InputType } from '@utils/types';
+import {
+  certificatedLogoUri,
+  parseReadableAmount,
+  truncateDecimals,
+} from '@utils/offchain/tokens';
+import { formatFee, parseRouteString } from '@utils/offchain/uniswap';
+import { InputType, ParsedRoute } from '@utils/types';
+import { Fragment } from 'react';
 
 const SwapMetadata = () => {
   const {
+    swapMetadata,
+    swapConfigs,
+    parseOffChainToken,
+    getReadableAmount,
     selectedTokenPair,
     inputValuePair,
     onSwapLoadingPair,
@@ -14,20 +26,24 @@ const SwapMetadata = () => {
     return (
       <div className="animate-pulse bg-gray-800 p-4 rounded-lg text-sm space-y-2">
         <div className="flex justify-between">
-          <span className="bg-gray-500 h-4 w-1/2"></span>
-          <span className="bg-gray-500 h-4 w-1/4"></span>
+          <span className="bg-gray-500 rounded-full h-4 my-[2px] w-1/3"></span>
+          <span className="bg-gray-500 rounded-full h-4 my-[2px] w-1/6"></span>
         </div>
         <div className="flex justify-between">
-          <span className="bg-gray-500 h-4 w-1/2"></span>
-          <span className="bg-gray-500 h-4 w-1/4"></span>
+          <span className="bg-gray-500 rounded-full h-4 my-[2px] w-1/6"></span>
+          <span className="bg-gray-500 rounded-full h-4 my-[2px] w-1/2"></span>
         </div>
         <div className="flex justify-between">
-          <span className="bg-gray-500 h-4 w-1/2"></span>
-          <span className="bg-gray-500 h-4 w-1/4"></span>
+          <span className="bg-gray-500 rounded-full h-4 my-[2px] w-1/4"></span>
+          <span className="bg-gray-500 rounded-full h-4 my-[2px] w-1/12"></span>
         </div>
         <div className="flex justify-between">
-          <span className="bg-gray-500 h-4 w-1/2"></span>
-          <span className="bg-gray-500 h-4 w-1/4"></span>
+          <span className="bg-gray-500 rounded-full h-4 my-[2px] w-1/6"></span>
+          <span className="bg-gray-500 rounded-full h-4 my-[2px] w-1/12"></span>
+        </div>
+        <div className="flex justify-between">
+          <span className="bg-gray-500 rounded-full h-4 my-[2px] w-1/4"></span>
+          <span className="bg-gray-500 rounded-full h-4 my-[2px] w-1/2"></span>
         </div>
       </div>
     );
@@ -37,21 +53,41 @@ const SwapMetadata = () => {
     return null;
   }
 
+  let parsedRoute: ParsedRoute[] = parseRouteString(
+    staticSwapResult.routeString,
+    staticSwapResult.route
+  );
+
+  console.log(parsedRoute);
+
   return (
     <div className="bg-gray-800 p-4 rounded-lg text-sm space-y-2">
       <div className="flex justify-between">
-        <span className="text-gray-400">Minimum Received</span>
-        <span className="text-white">79.01222</span>
+        <span className="text-gray-400">
+          {swapMetadata.tradeType === TradeType.EXACT_INPUT
+            ? 'Minimum Received'
+            : 'Maximum Spent'}
+        </span>
+        <span className="text-white">
+          {truncateDecimals(
+            swapMetadata.tradeType === TradeType.EXACT_INPUT
+              ? swapMetadata.minimumReceived
+              : swapMetadata.maximumSpent,
+            6
+          )}{' '}
+          {
+            selectedTokenPair[
+              swapMetadata.tradeType === TradeType.EXACT_INPUT
+                ? InputType.QUOTE
+                : InputType.BASE
+            ]?.symbol
+          }
+        </span>
       </div>
       <div className="flex justify-between">
-        <span className="text-gray-400">Rate</span>
+        <span className="text-gray-400">Best Price</span>
         <span className="text-white">
-          {allFilled(inputValuePair)
-            ? (
-                parseFloat(inputValuePair[InputType.QUOTE]!) /
-                parseFloat(inputValuePair[InputType.BASE]!)
-              ).toFixed(6)
-            : 0}{' '}
+          {truncateDecimals(swapMetadata.bestPrice, 6)}{' '}
           {selectedTokenPair[InputType.QUOTE]?.symbol} per{' '}
           {selectedTokenPair[InputType.BASE]?.symbol}
         </span>
@@ -62,82 +98,87 @@ const SwapMetadata = () => {
       </div>
       <div className="flex justify-between">
         <span className="text-gray-400">Slippage</span>
-        <span className="text-white">0.1%</span>
+        <span className="text-white">{swapConfigs.slippage}%</span>
       </div>
-      <div className="flex justify-between">
-        <span className="text-gray-400">Liquidity Source Fee</span>
-        <span className="text-white">0.3%</span>
+      <div className="flex justify-between pb-4">
+        <span className="text-gray-400">Gas Estimated</span>
+        <span className="text-white">
+          {truncateDecimals(swapMetadata.gweiFee, 0)}
+          {' Gwei ≈ $'}
+          {truncateDecimals(staticSwapResult.gasUseEstimateUSD, 4)}
+        </span>
       </div>
 
-      {/* <div
-        className={
-          staticSwapResult!.route.length > 0
-            ? 'h-48 flex flex-col'
-            : 'h-48 flex flex-col animate-pulse'
-        }
-      >
-        <div className="space-y-8">
-          {staticSwapResult!.route.map((routeStep, index) => (
-            <div
-              key={index}
-              className="bg-white rounded-lg shadow p-6 border border-gray-100"
-            >
-              <h3 className="text-lg font-semibold mb-4">
-                Route Step {index + 1} (
-                {((routeStep[0].amountIn / 1e18) * 100).toFixed(2)}%)
-              </h3>
-              {routeStep.map((pool, i) => (
-                <div
-                  key={i}
-                  className="border-b last:border-0 pb-4 mb-4 last:pb-0 last:mb-0"
-                >
-                  <div className="mb-2 text-sm font-medium text-gray-500">
-                    Pool: {pool.type.toUpperCase()}
-                  </div>
+      <hr className="border-gray-700" />
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <h4 className="text-gray-700 font-semibold">Token In</h4>
-                      <p className="text-gray-600">
-                        Symbol: {pool.tokenIn.symbol}
-                      </p>
-                      <p className="text-gray-600">
-                        Amount: {(pool.amountIn / 1e18).toFixed(4)}
-                      </p>
-                      <p className="text-gray-600">
-                        Address: {pool.tokenIn.address}
-                      </p>
-                    </div>
-
-                    <div>
-                      <h4 className="text-gray-700 font-semibold">Token Out</h4>
-                      <p className="text-gray-600">
-                        Symbol: {pool.tokenOut.symbol}
-                      </p>
-                      <p className="text-gray-600">
-                        Amount: {(pool.amountOut / 1e18).toFixed(4)}
-                      </p>
-                      <p className="text-gray-600">
-                        Address: {pool.tokenOut.address}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 text-gray-500">
-                    <p>Fee Tier: {(pool.fee / 10000).toFixed(2)}%</p>
-                    <p>Liquidity: {Number(pool.liquidity).toLocaleString()}</p>
-                    <p>
-                      Sqrt Price X96:{' '}
-                      {Number(pool.sqrtRatioX96).toLocaleString()}
-                    </p>
-                    <p>Current Tick: {pool.tickCurrent}</p>
-                  </div>
-                </div>
-              ))}
+      <div className="flex flex-col space-y-2 w-full max-w-2xl pt-4">
+        {parsedRoute.map(({ percentage, hops }, index) => (
+          <div key={index} className="flex items-center space-x-2">
+            <div className="flex-shrink-0">
+              <img
+                src={certificatedLogoUri(
+                  parseOffChainToken(hops[0].tokenA).logoURI
+                )}
+                alt={hops[0].tokenA.symbol}
+                className="w-6 h-6 rounded-full"
+              />
             </div>
-          ))}
-        </div>
-      </div> */}
+
+            <div className="flex-1 flex items-center">
+              <div className="bg-gray-200 rounded-lg px-2 py-0.5 flex items-center space-x-1 text-sm font-medium font-mono text-gray-800">
+                <span>V3</span>
+                <span>{percentage}%</span>
+              </div>
+
+              <div className="flex-1 mx-2 border-t-2 border-dotted border-gray-200" />
+
+              {hops.map((pool, poolIndex) => (
+                <Fragment key={poolIndex}>
+                  <div className="flex items-center space-x-1 ">
+                    <div className="flex bg-gray-200 text-gray-800 font-medium font-mono text-xs rounded-lg p-0.5">
+                      <img
+                        src={certificatedLogoUri(
+                          parseOffChainToken(pool.tokenA).logoURI
+                        )}
+                        alt={pool.tokenA.symbol}
+                        className="w-4 h-4 border-[0.5px] border-gray-800 rounded-full"
+                      />
+                      <img
+                        src={certificatedLogoUri(
+                          parseOffChainToken(pool.tokenB).logoURI
+                        )}
+                        alt={pool.tokenB.symbol}
+                        className="w-4 h-4 border-[0.5px] border-gray-800 rounded-full -ml-2"
+                      />
+                      <span className="mx-1">{formatFee(pool.fee)}</span>
+                    </div>
+                  </div>
+                  {poolIndex < hops.length - 1 && (
+                    <div className="flex-1 mx-2 border-t-2 border-dotted border-gray-200" />
+                  )}
+                </Fragment>
+              ))}
+
+              <div className="flex-1 mx-2 border-t-2 border-dotted border-gray-200" />
+            </div>
+
+            <div className="flex-shrink-0">
+              <img
+                src={certificatedLogoUri(
+                  parseOffChainToken(hops[hops.length - 1].tokenB).logoURI
+                )}
+                alt={hops[hops.length - 1].tokenB.symbol}
+                className="w-6 h-6 rounded-full"
+              />
+            </div>
+          </div>
+        ))}
+        <p className="text-gray-400 text-xs text-center pt-4">
+          This route optimizes your total output by considering
+          <br />
+          split routes, multiple hops, and the gas cost of each step.
+        </p>
+      </div>
     </div>
   );
 };

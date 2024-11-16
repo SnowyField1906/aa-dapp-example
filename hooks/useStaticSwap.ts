@@ -9,30 +9,25 @@ import {
 import {
   InputType,
   OffChainToken,
+  OnchainToken,
   Pair,
   PairOpt,
+  SwapConfigs,
+  SwapMetadata,
   UniswapStaticSwapResponse,
 } from '@utils/types';
 import { TradeType } from '@uniswap/sdk-core';
-import { staticSwap } from '@utils/onchain/uniswap';
 import {
-  allEmpty,
   allFilled,
   oppositeOf,
   someFilled,
   unwrapPair,
 } from '@utils/offchain/base';
 import { getBalance } from '@utils/onchain/tokens';
+import { staticSwap } from '@utils/offchain/uniswap';
 
 const useStaticSwap = () => {
   const [tokenList, setTokenList] = useState<OffChainToken[]>([]);
-  useEffect(() => {
-    (async () => {
-      const initialTokenList = await getTokenList();
-      setTokenList(initialTokenList);
-    })();
-  }, []);
-
   const [selectedTokenPair, setSelectedTokenPair] = useState<
     PairOpt<OffChainToken>
   >({
@@ -55,15 +50,46 @@ const useStaticSwap = () => {
     [InputType.BASE]: false,
     [InputType.QUOTE]: false,
   });
+  const [activeInput, setActiveInput] = useState<InputType>();
   const [staticSwapResult, setStaticSwapResult] =
     useState<UniswapStaticSwapResponse>();
+  const [swapConfigs, setSwapConfigs] = useState<SwapConfigs>({
+    slippage: 30,
+    gasBuffer: 10,
+  });
+  const [swapMetadata, setSwapMetadata] = useState<SwapMetadata>({
+    minimumReceived: '',
+    maximumSpent: '',
+    gasToPay: '',
+    gweiFee: '',
+    bestPrice: '',
+    tradeType: TradeType.EXACT_INPUT,
+  });
 
+  useEffect(() => {
+    (async () => {
+      const initialTokenList = await getTokenList();
+      setTokenList(initialTokenList);
+    })();
+  }, []);
+
+  const parseOffChainToken = (token: OnchainToken): OffChainToken => {
+    return {
+      chainId: token.chainId,
+      address: token.address,
+      decimals: token.decimals,
+      symbol: token.symbol!,
+      name: token.name!,
+      logoURI: tokenList.find((t) => t.symbol === token.symbol)?.logoURI ?? '',
+    };
+  };
   const getReadableAmount = (input: InputType): string => {
     try {
       let readableAmount = parseReadableAmount(
         inputValuePair[input],
         selectedTokenPair[input]!.decimals
       );
+      console.log({ input: inputValuePair[input], readableAmount });
       return readableAmount;
     } catch {
       return '';
@@ -71,7 +97,7 @@ const useStaticSwap = () => {
   };
 
   const handleFlipOrder = useCallback(() => {
-    if (allEmpty(selectedTokenPair)) {
+    if (someFilled(selectedTokenPair)) {
       setSelectedTokenPair({
         [InputType.BASE]: selectedTokenPair[InputType.QUOTE],
         [InputType.QUOTE]: selectedTokenPair[InputType.BASE],
@@ -88,46 +114,40 @@ const useStaticSwap = () => {
         [InputType.BASE]: inputValuePair[InputType.QUOTE],
         [InputType.QUOTE]: inputValuePair[InputType.BASE],
       });
+      setActiveInput(InputType.BASE);
     }
   }, [selectedTokenPair, fiatPricePair, balancePair, inputValuePair]);
 
   const handleUpdateToken = (input: InputType, token: OffChainToken) => {
-    setSelectedTokenPair((prev) => ({ ...prev, [input]: token }));
+    setSelectedTokenPair({ ...selectedTokenPair, [input]: token });
+    if (inputValuePair[oppositeOf(input)]) {
+      setActiveInput(oppositeOf(input));
+    }
   };
   const handleUpdateBalance = async (input: InputType, address: string) => {
     try {
-      let balance = await getBalance(
-        selectedTokenPair[input]!.address,
-        address
-      );
-      setBalancePair((prev) => ({ ...prev, [input]: balance }));
+      let r = await getBalance(selectedTokenPair[input]!.address, address);
+      console.log({ r, address, token: selectedTokenPair[input]!.address });
+      setBalancePair({ ...balancePair, [input]: r });
     } catch {
-      setBalancePair((prev) => ({ ...prev, [input]: '' }));
+      setBalancePair({ ...balancePair, [input]: '' });
     }
   };
   const handleUpdateFiatPrice = async (input: InputType, amount: string) => {
     try {
-      let fiatPrice = await getTokenFiatPrice(
-        selectedTokenPair[input]!.symbol,
-        amount
-      );
-      setFiatPricePair((prev) => ({ ...prev, [input]: fiatPrice }));
+      let r = await getTokenFiatPrice(selectedTokenPair[input]!.symbol, amount);
+      setFiatPricePair({ ...fiatPricePair, [input]: r });
     } catch {
-      setFiatPricePair((prev) => ({ ...prev, [input]: '' }));
+      setFiatPricePair({ ...fiatPricePair, [input]: '' });
     }
   };
-  const handleUpdateInputValue = (input: InputType, amount: string): string => {
+  const handleUpdateInputValue = (input: InputType, amount: string) => {
     try {
-      let value = parseTokenValue(amount, selectedTokenPair[input]!.decimals);
-      let readableAmount = parseReadableAmount(
-        value,
-        selectedTokenPair[input]!.decimals
-      );
-      setInputValuePair((prev) => ({ ...prev, [input]: value }));
-      return readableAmount;
+      let r = parseTokenValue(amount, selectedTokenPair[input]!.decimals);
+      setInputValuePair({ ...inputValuePair, [input]: r });
+      setActiveInput(input);
     } catch {
-      setInputValuePair((prev) => ({ ...prev, [input]: '' }));
-      return '';
+      setInputValuePair({ ...inputValuePair, [input]: '' });
     }
   };
 
@@ -135,65 +155,101 @@ const useStaticSwap = () => {
     async (tradeType: TradeType, updatedInput: InputType) => {
       const oppositeInput = oppositeOf(updatedInput);
 
-      setOnSwapLoadingPair((prev) => ({ ...prev, [oppositeInput]: true }));
+      try {
+        setOnSwapLoadingPair({ ...onSwapLoadingPair, [oppositeInput]: true });
 
-      const result = await staticSwap(
-        parseOnChainTokenPair(unwrapPair(selectedTokenPair)),
-        inputValuePair,
-        tradeType
-      );
-      setStaticSwapResult(result);
-      setInputValuePair((prev) => ({ ...prev, [oppositeInput]: result.quote }));
+        const result = await staticSwap(
+          parseOnChainTokenPair(unwrapPair(selectedTokenPair)),
+          inputValuePair,
+          tradeType
+        );
+        setStaticSwapResult(result);
 
-      setOnSwapLoadingPair((prev) => ({ ...prev, [oppositeInput]: false }));
+        setInputValuePair({ ...inputValuePair, [oppositeInput]: result.quote });
+      } catch {
+        setInputValuePair({ ...inputValuePair, [oppositeInput]: '' });
+      } finally {
+        setSwapMetadata({
+          ...swapMetadata,
+          tradeType,
+        });
+        setOnSwapLoadingPair({ ...onSwapLoadingPair, [oppositeInput]: false });
+        setActiveInput(undefined);
+      }
     },
     [selectedTokenPair, inputValuePair]
   );
 
-  const prevBaseInputValue = useRef(inputValuePair[InputType.BASE]);
-  const prevQuoteInputValue = useRef(inputValuePair[InputType.QUOTE]);
-  const baseSelectedToken = selectedTokenPair[InputType.BASE];
-  const quoteSelectedToken = selectedTokenPair[InputType.QUOTE];
-  const baseInputValue = inputValuePair[InputType.BASE];
-  const quoteInputValue = inputValuePair[InputType.QUOTE];
-
-  // Exact Input Swap: Call when [quoteSelectedToken, baseInputValue] changes
   useEffect(() => {
-    let enoughData = allFilled(selectedTokenPair) && someFilled(inputValuePair);
-    let isBaseChanged =
-      prevBaseInputValue.current !== inputValuePair[InputType.BASE];
+    if (
+      allFilled(selectedTokenPair) &&
+      someFilled(inputValuePair) &&
+      activeInput
+    ) {
+      const tradeType =
+        activeInput === InputType.BASE
+          ? TradeType.EXACT_INPUT
+          : TradeType.EXACT_OUTPUT;
 
-    if (enoughData && isBaseChanged) {
-      handleSwap(TradeType.EXACT_INPUT, InputType.BASE);
-      prevBaseInputValue.current = inputValuePair[InputType.BASE];
+      handleSwap(tradeType, activeInput);
     }
-  }, [quoteSelectedToken, baseInputValue]);
+  }, [selectedTokenPair, inputValuePair, activeInput]);
 
-  // Exact Output Swap: Call when [baseSelectedToken, quoteInputValue] changes
   useEffect(() => {
-    let enoughData = allFilled(selectedTokenPair) && someFilled(inputValuePair);
-    let isQuoteChanged =
-      prevQuoteInputValue.current !== inputValuePair[InputType.QUOTE];
+    if (!swapMetadata || !staticSwapResult) return;
 
-    if (enoughData && isQuoteChanged) {
-      handleSwap(TradeType.EXACT_OUTPUT, InputType.QUOTE);
-      prevQuoteInputValue.current = inputValuePair[InputType.QUOTE];
-    }
-  }, [baseSelectedToken, quoteInputValue]);
+    setSwapMetadata({
+      ...swapMetadata,
+      minimumReceived: (
+        parseFloat(inputValuePair[InputType.QUOTE]!) *
+        (1 - swapConfigs.slippage / 100)
+      ).toString(),
+      maximumSpent: (
+        parseFloat(inputValuePair[InputType.BASE]!) *
+        (1 + swapConfigs.slippage / 100)
+      ).toString(),
+      gweiFee: parseReadableAmount(
+        (
+          BigInt(staticSwapResult!.gasUseEstimate) *
+          BigInt(staticSwapResult!.gasPriceWei)
+        ).toString(),
+        9
+      ),
+      bestPrice: (
+        parseFloat(inputValuePair[InputType.QUOTE]!) /
+        parseFloat(inputValuePair[InputType.BASE]!)
+      ).toString(),
+      gasToPay: (
+        Number(staticSwapResult!.gasUseEstimate) *
+        (1 + swapConfigs.gasBuffer / 100)
+      ).toString(),
+    });
+  }, [staticSwapResult, swapConfigs]);
 
   return {
+    // tokens
     tokenList,
+    parseOffChainToken,
     getReadableAmount,
+
+    // pairs
     selectedTokenPair,
     balancePair,
     fiatPricePair,
     inputValuePair,
     onSwapLoadingPair,
+
+    // pair handlers
     handleUpdateToken,
     handleFlipOrder,
     handleUpdateBalance,
     handleUpdateFiatPrice,
     handleUpdateInputValue,
+
+    // swap
+    swapConfigs,
+    setSwapConfigs,
+    swapMetadata,
     staticSwapResult,
     handleSwap,
   };

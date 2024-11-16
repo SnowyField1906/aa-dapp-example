@@ -1,9 +1,9 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import {
   EChain,
   PublicUserWallet,
-  TransactionPayload,
-  TransactionResult,
+  TransactionRequest,
+  TransactionResponse,
   TransferNativePayload,
   TransferTokenPayload,
 } from '../types';
@@ -13,11 +13,13 @@ const TARGET_WALLET = 'http://localhost:3000/transaction_signing';
 const useWallet = (chain: EChain) => {
   const [userWallet, setUserWallet] =
     useState<PublicUserWallet<typeof chain>>();
-  const [transactionResult, setTransactionResult] =
-    useState<TransactionResult<typeof chain>>();
+  const [transactionResponse, setTransactionResponse] =
+    useState<TransactionResponse<typeof chain>>();
 
-  const _popup = (): Window =>
-    window.open(TARGET_WALLET, 'popup', 'width=600,height=800')!;
+  const _popup = (): Window => {
+    const popupName = `popup-${Date.now()}`;
+    return window.open(TARGET_WALLET, popupName, 'width=600,height=800')!;
+  };
 
   const login = useCallback(() => {
     const walletWindow = _popup();
@@ -40,31 +42,54 @@ const useWallet = (chain: EChain) => {
 
   const logout = () => {
     setUserWallet(undefined);
-    setTransactionResult(undefined);
+    setTransactionResponse(undefined);
   };
 
-  const sendTransaction = useCallback(
-    async (payload: TransactionPayload<typeof chain>) => {
-      if (!userWallet) throw new Error('User wallet not found');
-      const walletWindow = _popup();
+  const transactionQueue = useRef<(() => Promise<void>)[]>([]);
 
-      const handleMessage = (event: MessageEvent) => {
-        if (event.data.type === 'READY') {
-          walletWindow.postMessage(
-            { type: 'SIGN_TRANSACTION_REQUEST', payload, userWallet },
-            '*'
-          );
-        }
-        if (event.data.type === 'SIGN_TRANSACTION_RESPONSE') {
-          setTransactionResult(event.data.transactionResult);
-          walletWindow.close();
-        }
-      };
+  const processQueue = useCallback(async () => {
+    while (transactionQueue.current.length > 0) {
+      const transaction = transactionQueue.current.shift();
+      if (transaction) await transaction();
+    }
+  }, []);
 
-      window.addEventListener('message', handleMessage);
-      return () => window.removeEventListener('message', handleMessage);
+  const queueTransaction = useCallback(
+    (transaction: () => Promise<void>) => {
+      transactionQueue.current.push(transaction);
+      if (transactionQueue.current.length === 1) {
+        processQueue();
+      }
     },
-    [userWallet, transactionResult]
+    [processQueue]
+  );
+
+  const sendTransaction = useCallback(
+    async (payload: TransactionRequest<typeof chain>): Promise<void> => {
+      if (!userWallet) throw new Error('User wallet not found');
+      queueTransaction(async () => {
+        const walletWindow = _popup();
+
+        return new Promise<void>((resolve) => {
+          const handleMessage = (event: MessageEvent) => {
+            if (event.data.type === 'READY') {
+              walletWindow.postMessage(
+                { type: 'SIGN_TRANSACTION_REQUEST', payload, userWallet },
+                '*'
+              );
+            }
+            if (event.data.type === 'SIGN_TRANSACTION_RESPONSE') {
+              setTransactionResponse(event.data.signed);
+              walletWindow.close();
+              resolve();
+            }
+          };
+
+          window.addEventListener('message', handleMessage, { once: true });
+        });
+      });
+    },
+    [userWallet, queueTransaction]
   );
 
   const transferToken = useCallback(
@@ -80,7 +105,7 @@ const useWallet = (chain: EChain) => {
           );
         }
         if (event.data.type === 'TRANSFER_TOKEN_RESPONSE') {
-          setTransactionResult(event.data.transactionStatus);
+          setTransactionResponse(event.data.signed);
           walletWindow.close();
         }
       };
@@ -88,7 +113,7 @@ const useWallet = (chain: EChain) => {
       window.addEventListener('message', handleMessage);
       return () => window.removeEventListener('message', handleMessage);
     },
-    [userWallet, transactionResult]
+    [userWallet]
   );
 
   const transferNative = useCallback(
@@ -104,7 +129,7 @@ const useWallet = (chain: EChain) => {
           );
         }
         if (event.data.type === 'TRANSFER_NATIVE_RESPONSE') {
-          setTransactionResult(event.data.transactionStatus);
+          setTransactionResponse(event.data.signed);
           walletWindow.close();
         }
       };
@@ -112,12 +137,12 @@ const useWallet = (chain: EChain) => {
       window.addEventListener('message', handleNativeMessage);
       return () => window.removeEventListener('message', handleNativeMessage);
     },
-    [userWallet, transactionResult]
+    [userWallet]
   );
 
   return {
     userWallet,
-    transactionResult,
+    transactionResponse,
     login,
     logout,
     sendTransaction,

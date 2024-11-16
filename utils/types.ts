@@ -1,4 +1,4 @@
-import { Token } from '@uniswap/sdk-core';
+import { Token, TradeType } from '@uniswap/sdk-core';
 
 export type Address = string;
 
@@ -36,6 +36,19 @@ export enum InputType {
   QUOTE = 'Receive',
 }
 
+export type SwapConfigs = {
+  slippage: number;
+  gasBuffer: number;
+};
+export type SwapMetadata = {
+  minimumReceived: string;
+  maximumSpent: string;
+  gasToPay: string;
+  gweiFee: string;
+  bestPrice: string;
+  tradeType: TradeType;
+};
+
 /* Uniswap V3 APIs */
 
 export type UniswapStaticToken = {
@@ -55,6 +68,10 @@ export type UniswapStaticRoute = {
   tickCurrent: string;
   amountIn: string;
   amountOut: string;
+};
+export type ParsedRoute = {
+  percentage: number;
+  hops: PoolIdentifier[];
 };
 
 export type UniswapStaticSwapRequest = {
@@ -81,7 +98,7 @@ export type UniswapStaticSwapResponse = {
   simulationStatus: string;
   simulationError: boolean;
   gasPriceWei: string;
-  route: [UniswapStaticRoute][];
+  route: UniswapStaticRoute[][];
   routeString: string;
   quoteId: string;
   hitsCachedRoutes: boolean;

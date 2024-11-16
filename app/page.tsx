@@ -32,7 +32,7 @@ const App = () => {
               className="text-white py-2 px-5 bg-gray-800 rounded-full hover:bg-gray-700"
               onClick={login}
             >
-              Login
+              Connect Wallet
             </button>
           )}
         </div>

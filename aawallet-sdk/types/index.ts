@@ -1,29 +1,23 @@
-import { TransactionResponse } from '@solana/web3.js';
-import { Transaction } from 'ethers';
+import {
+  Transaction as SolanaTransactionRequest,
+  TransactionResponse as SolanaTransactionResponse,
+} from '@solana/web3.js';
+import {
+  TransactionRequest as EthereumTransactionRequest,
+  TransactionResponse as EthereumTransactionResponse,
+} from 'ethers';
 
 export enum EChain {
   ETHEREUM = 'ETHEREUM',
   SOLANA = 'SOLANA',
 }
 
-export type EthereumTransactionPayload = {
-  contractAddress: string;
-  gasLimit: string;
-  value: string;
-  abi: any;
-  functionFragment: string;
-  functionArguments: string[];
-};
-export type SolanaTransactionPayload = {
-  programId: string;
-  instruction: string;
-  idl: string;
-};
-export type TransactionPayload<T extends EChain> = T extends EChain.ETHEREUM
-  ? EthereumTransactionPayload
-  : T extends EChain.SOLANA
-  ? SolanaTransactionPayload
-  : never;
+export type TransactionRequest<T extends EChain = EChain> =
+  T extends EChain.ETHEREUM
+    ? EthereumTransactionRequest
+    : T extends EChain.SOLANA
+    ? SolanaTransactionRequest
+    : never;
 
 export type TransferNativePayload = {
   recipient: string;
@@ -35,16 +29,30 @@ export type TransferTokenPayload = {
   tokenAddress: string;
 };
 
-export type TransactionResult<T extends EChain> = {
+export type TransactionResponse<T extends EChain = EChain> = {
   success: boolean;
-  receipt?: T extends EChain.ETHEREUM
-    ? Transaction
+  signed?: T extends EChain.ETHEREUM
+    ? EthereumTransactionResponse
     : T extends EChain.SOLANA
-    ? TransactionResponse
+    ? string // ? SolanaTransactionResponse
     : never;
 };
 
-export type PublicUserWallet<T extends EChain> = {
+export type PublicUserWallet<T extends EChain = EChain> = {
   address: string;
   chain: T;
+};
+
+export type PostMessageData<T extends EChain = EChain> =
+  PostMessageRequest<T> & {
+    origin: string;
+  };
+export type PostMessageRequest<T extends EChain = EChain> = {
+  type:
+    | 'DERIVE_ADDRESS_REQUEST'
+    | 'SIGN_TRANSACTION_REQUEST'
+    | 'TRANSFER_TOKEN_REQUEST'
+    | 'TRANSFER_NATIVE_REQUEST';
+  payload?: TransactionRequest<T>;
+  userWallet?: PublicUserWallet<T>;
 };

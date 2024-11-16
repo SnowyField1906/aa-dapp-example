@@ -1,18 +1,28 @@
 'use client';
 
-import { ethers } from 'ethers';
+import { Contract, ethers } from 'ethers';
 import { Address } from '../types';
-import { PROVIDER } from '../constants';
+import { I_ERC20_ABI, PROVIDER } from '../constants';
 
 export const getBalance = async (
   tokenAddress: Address,
-  userAddress: Address
+  ownerAddress: Address
 ): Promise<string> => {
-  const contract = new ethers.Contract(
-    tokenAddress,
-    ['function balanceOf(address) view returns (uint256)'],
-    PROVIDER
-  );
-  const balance = await contract.balanceOf(userAddress);
+  const contract = new ethers.Contract(tokenAddress, I_ERC20_ABI, PROVIDER);
+  const balance = await contract.balanceOf(ownerAddress);
   return balance.toString();
+};
+
+export const getAllowance = async (
+  tokenAddress: Address,
+  ownerAddress: Address,
+  spenderAddress: Address
+): Promise<string> => {
+  const contract = new ethers.Contract(tokenAddress, I_ERC20_ABI, PROVIDER);
+  const allowance = await contract.allowance(ownerAddress, spenderAddress);
+  return allowance.toString();
+};
+
+export const getErc20 = async (address: Address) => {
+  return new Contract(address, I_ERC20_ABI, PROVIDER);
 };

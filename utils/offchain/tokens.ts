@@ -1,7 +1,13 @@
 'use client';
 
 import { CHAIN_ID } from '../constants';
-import { InputType, OffChainToken, OnchainToken, Pair } from '../types';
+import {
+  InputType,
+  OffChainToken,
+  OnchainToken,
+  Pair,
+  UniswapStaticToken,
+} from '../types';
 import { Token } from '@uniswap/sdk-core';
 import defaultTokenList from '@uniswap/default-token-list';
 import additionalTokenList from './additional_token_list.json';
@@ -17,8 +23,16 @@ export const getTokenList = async (
   return [...filtered, ...additionalTokenList];
 };
 
-export const parseOnChainToken = (t: OffChainToken): OnchainToken => {
-  return new Token(t.chainId, t.address, t.decimals, t.symbol, t.name);
+export const parseOnChainToken = (
+  t: OffChainToken | UniswapStaticToken
+): OnchainToken => {
+  return new Token(
+    t.chainId,
+    t.address,
+    Number(t.decimals),
+    t.symbol,
+    (t as any)?.name ?? ''
+  );
 };
 export const parseOnChainTokenPair = (
   pair: Pair<OffChainToken>
@@ -40,7 +54,7 @@ export const parseTokenValue = (amount: string, decimals: number): string => {
   if (amount === '') throw new Error('Empty value');
 
   const separator = amount.indexOf('.') !== -1 ? '.' : ',';
-  const [integer, fraction] = amount.split(separator);
+  let [integer, fraction] = amount.split(separator);
   const integerPart = BigInt(integer);
   const fractionPart = BigInt(fraction || '0');
 
@@ -48,7 +62,7 @@ export const parseTokenValue = (amount: string, decimals: number): string => {
     return (integerPart * BigInt(10 ** decimals)).toString();
   }
   if (fraction.length > decimals) {
-    throw new Error('Too many decimal places');
+    fraction = fraction.slice(0, decimals);
   }
 
   const fractionMultiplier = BigInt(10 ** (decimals - fraction.length));
@@ -57,10 +71,10 @@ export const parseTokenValue = (amount: string, decimals: number): string => {
     fractionPart * fractionMultiplier
   ).toString();
 };
-
 export const parseReadableAmount = (
   value: string,
-  decimals: number
+  decimals: number,
+  truncate: number = 6
 ): string => {
   if (value === '') throw new Error('Empty value');
 
@@ -71,13 +85,13 @@ export const parseReadableAmount = (
     return integer.toString();
   }
 
-  const padStarts = decimals - fraction.toString().length + 1;
-  const trimmedFraction = fraction
-    .toString()
-    .replace(/0+$/, '')
-    .padStart(padStarts, '0');
-  const readableAmount = `${integer}.${trimmedFraction}`;
-  return truncateDecimals(readableAmount, 6);
+  const fractionString = fraction.toString();
+  const padStarts = decimals - fractionString.length;
+  const trimmedFraction = fractionString.replace(/0+$/, '');
+  const paddedFraction = '0'.repeat(padStarts) + trimmedFraction;
+  const truncatedFraction = paddedFraction.slice(0, truncate);
+
+  return `${integer}.${truncatedFraction}`;
 };
 
 export const truncateDecimals = (
@@ -85,7 +99,7 @@ export const truncateDecimals = (
   decimals: number
 ): string => {
   const [integer, fraction] = readableAmount.split('.');
-  if (!fraction) {
+  if (!fraction || fraction.slice(0, decimals) === '') {
     return integer;
   }
   return `${integer}.${fraction.slice(0, decimals)}`;
