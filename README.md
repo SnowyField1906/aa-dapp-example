@@ -1,6 +1,6 @@
-### AAWallet SDK
+## AAWallet SDK
 
-Source: [aawallet-sdk](./aawallet-sdk/index.ts)
+Source: [@aawallet-sdk](./aawallet-sdk/index.ts)
 
 AAWallet SDK provides a Context Wrapper (Provider) for the application to interact to AAWallet with the following states and methods:
 
