@@ -50,18 +50,18 @@
         "@types/node": "^20",
         "@types/react": "^18",
         "@types/react-dom": "^18",
+        "@typescript-eslint/eslint-plugin": "^6.19.1",
         "chai": "^4.3.4",
+        "eslint": "^8",
+        "eslint-config-next": "14.1.0",
+        "eslint-config-prettier": "^9.1.0",
         "hardhat": "^2.22.15",
         "mocha": "^9.0.3",
         "postcss": "^8",
+        "prettier": "^3.2.5",
+        "prettier-plugin-tailwindcss": "^0.5.11",
         "tailwindcss": "^3.4.1",
         "ts-mocha": "^10.0.0",
-        "typescript": "^5",
-        "eslint": "^8",
-        "@typescript-eslint/eslint-plugin": "^6.19.1",
-        "eslint-config-next": "14.1.0",
-        "eslint-config-prettier": "^9.1.0",
-        "prettier": "^3.2.5",
-        "prettier-plugin-tailwindcss": "^0.5.11"
+        "typescript": "^5"
     }
 }

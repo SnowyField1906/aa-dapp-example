@@ -12,171 +12,172 @@ import { TradeType } from '@uniswap/sdk-core'
 import { constructPath } from '@utils/offchain/uniswap'
 import { useEffect, useState } from 'react'
 import { ethers } from 'ethers'
+import { EChain, TransactionResponse } from '@aawallet-sdk/types'
+import { parseTokenValue } from '@utils/offchain/tokens'
 
 const Swap = () => {
-	const { userWallet, login, sendTransaction, waitTransaction } =
-		useWalletContext()
-	const {
-		selectedTokenPair,
-		inputValuePair,
-		swapMetadata,
-		staticSwapResult,
-		handleFlipOrder,
-		handleUpdateBalance,
-	} = useStaticSwapContext()
-	const [step, setStep] = useState<
-		| 'GUEST'
-		| 'INPUT'
-		| 'CONFIRMING'
-		| 'CANCELED'
-		| 'EXECUTING'
-		| 'SUCCESS'
-		| 'FAILED'
-	>(userWallet ? 'INPUT' : 'GUEST')
-	const [hash, setHash] = useState<string>()
+  const { userWallet, login, sendTransaction, waitTransaction } = useWalletContext()
+  const {
+    selectedTokenPair,
+    inputValuePair,
+    swapMetadata,
+    staticSwapResult,
+    handleFlipOrder,
+    handleUpdateBalance,
+  } = useStaticSwapContext()
+  const [step, setStep] = useState<
+    'GUEST' | 'INPUT' | 'CONFIRMING' | 'CANCELED' | 'EXECUTING' | 'SUCCESS' | 'FAILED'
+  >(userWallet ? 'INPUT' : 'GUEST')
+  const [hash, setHash] = useState<string>()
 
-	const executeSwap = async () => {
-		setStep('CONFIRMING')
-		const hops = staticSwapResult!.route.flat()
+  const executeSwap = async () => {
+    setStep('CONFIRMING')
+    const hops = staticSwapResult!.route.flat()
 
-		const uniqueAddresses: Address[] = Array.from(
-			new Set(
-				hops.map((hop) => [hop.tokenIn.address, hop.tokenOut.address]).flat()
-			)
-		)
-		const approvalsNeeded: Address[] = await Promise.all(
-			uniqueAddresses.map((address) =>
-				getAllowance(address, userWallet!.address, ROUTER_ADDRESS).then(
-					(allowance) => (allowance === '0' ? address : '')
-				)
-			)
-		).then((addresses) => addresses.filter((address) => address !== ''))
+    const uniqueAddresses: Address[] = Array.from(
+      new Set(hops.map((hop) => [hop.tokenIn.address, hop.tokenOut.address]).flat())
+    )
+    const approvalsNeeded: Address[] = await Promise.all(
+      uniqueAddresses.map((address) =>
+        getAllowance(address, userWallet!.address, ROUTER_ADDRESS).then((allowance) =>
+          allowance === '0' ? address : ''
+        )
+      )
+    ).then((addresses) => addresses.filter((address) => address !== ''))
 
-		for (const address of approvalsNeeded) {
-			const contractInterface = new ethers.Interface(I_ERC20_ABI)
-			const data = contractInterface.encodeFunctionData('approve', [
-				ROUTER_ADDRESS,
-				'115792089237316195423570985008687907853269984665640564039457584007913129639935',
-			])
-			await sendTransaction({
-				from: userWallet!.address,
-				to: address,
-				gasLimit: '100000',
-				value: '0',
-				data,
-			})
-		}
+    for (const address of approvalsNeeded) {
+      const contractInterface = new ethers.Interface(I_ERC20_ABI)
+      const data = contractInterface.encodeFunctionData('approve', [
+        ROUTER_ADDRESS,
+        '115792089237316195423570985008687907853269984665640564039457584007913129639935',
+      ])
+      await sendTransaction({
+        from: userWallet!.address,
+        to: address,
+        gasLimit: '100000',
+        value: '0',
+        data,
+      })
+    }
 
-		const contractInterface = new ethers.Interface(I_ROUTER_ABI)
-		const data = contractInterface.encodeFunctionData(
-			swapMetadata.tradeType === TradeType.EXACT_INPUT
-				? 'exactInput'
-				: 'exactOutput',
-			[
-				[
-					constructPath(hops, swapMetadata.tradeType),
-					userWallet!.address,
-					inputValuePair[
-						swapMetadata.tradeType === TradeType.EXACT_INPUT
-							? InputType.BASE
-							: InputType.QUOTE
-					],
-					swapMetadata.tradeType === TradeType.EXACT_INPUT
-						? '1'
-						: '115792089237316195423570985008687907853269984665640564039457584007913129639935',
-				],
-			]
-		)
+    const contractInterface = new ethers.Interface(I_ROUTER_ABI)
+    const data = contractInterface.encodeFunctionData(
+      swapMetadata.tradeType === TradeType.EXACT_INPUT ? 'exactInput' : 'exactOutput',
+      [
+        [
+          constructPath(hops, swapMetadata.tradeType),
+          userWallet!.address,
+          inputValuePair[
+            swapMetadata.tradeType === TradeType.EXACT_INPUT ? InputType.BASE : InputType.QUOTE
+          ],
+          swapMetadata.tradeType === TradeType.EXACT_INPUT
+            ? parseTokenValue(
+                swapMetadata.minimumReceived,
+                selectedTokenPair[InputType.QUOTE]!.decimals
+              )
+            : parseTokenValue(
+                swapMetadata.maximumSpent,
+                selectedTokenPair[InputType.BASE]!.decimals
+              ),
+        ],
+      ]
+    )
 
-		const response = await sendTransaction({
-			from: userWallet!.address,
-			to: ROUTER_ADDRESS,
-			gasLimit: (Number(staticSwapResult!.gasUseEstimate) * 2).toString(),
-			value: '0',
-			data,
-		})
+    const response = (await sendTransaction({
+      from: userWallet!.address,
+      to: ROUTER_ADDRESS,
+      gasLimit: (Number(staticSwapResult!.gasUseEstimate) * 2).toString(),
+      value: '0',
+      data,
+    })) as TransactionResponse<EChain.ETHEREUM>
 
-		console.log('Transaction response: ', response)
+    console.log('Transaction response: ', response)
 
-		if (response.success) {
-			setStep('EXECUTING')
-			setHash(response.signed.hash)
-			const receipt = await waitTransaction(response.signed.hash)
-			console.log('Transaction receipt: ', receipt)
-			setStep(receipt.success ? 'SUCCESS' : 'FAILED')
-		} else {
-			setStep('CANCELED')
-		}
+    if (response.success) {
+      setStep('EXECUTING')
+      setHash(response.signed.hash)
+      const receipt = await waitTransaction(response.signed.hash)
 
-		await handleUpdateBalance(InputType.BASE, userWallet!.address)
-		await handleUpdateBalance(InputType.QUOTE, userWallet!.address)
-	}
+      console.log('Transaction receipt: ', receipt)
 
-	const isFinalStep =
-		step === 'CANCELED' ||
-		step === 'CONFIRMING' ||
-		step === 'SUCCESS' ||
-		step === 'FAILED'
+      if (receipt.success) {
+        setStep('SUCCESS')
+      } else {
+        alert(`Transaction failed with reason: ${receipt.error.message}`)
+        setStep('FAILED')
+      }
+    } else {
+      alert(`Signing failed with reason: ${response.error.message}`)
+      setStep('CANCELED')
+    }
+    await Promise.all([
+      handleUpdateBalance(InputType.BASE, userWallet!.address),
+      handleUpdateBalance(InputType.QUOTE, userWallet!.address),
+    ])
+  }
 
-	useEffect(() => {
-		if (isFinalStep) {
-			setStep('INPUT')
-			setHash(undefined)
-		}
-	}, [staticSwapResult])
-	useEffect(() => {
-		setStep(userWallet ? 'INPUT' : 'GUEST')
-		setHash(undefined)
-	}, [userWallet])
+  const isFinalStep =
+    step === 'CANCELED' || step === 'CONFIRMING' || step === 'SUCCESS' || step === 'FAILED'
 
-	return (
-		<div className="w-2xl w-2xl mx-auto flex flex-col gap-6 rounded-lg bg-gray-900 p-6 text-white shadow-lg">
-			<FaCog className="ml-auto cursor-pointer text-gray-400" />
+  useEffect(() => {
+    if (isFinalStep) {
+      setStep('INPUT')
+      setHash(undefined)
+    }
+  }, [staticSwapResult])
+  useEffect(() => {
+    setStep(userWallet ? 'INPUT' : 'GUEST')
+    setHash(undefined)
+  }, [userWallet])
 
-			<hr className="border-gray-700" />
+  return (
+    <div className="w-2xl w-2xl mx-auto flex flex-col gap-6 rounded-lg bg-gray-900 p-6 text-white shadow-lg">
+      <FaCog className="ml-auto cursor-pointer text-gray-400" />
 
-			<TokenInput input={InputType.BASE} />
+      <hr className="border-gray-700" />
 
-			<div className="flex items-center justify-center">
-				<FaExchangeAlt
-					className="rotate-90 transform cursor-pointer text-gray-400"
-					onClick={handleFlipOrder}
-				/>
-			</div>
+      <TokenInput input={InputType.BASE} />
 
-			<TokenInput input={InputType.QUOTE} />
+      <div className="flex items-center justify-center">
+        <FaExchangeAlt
+          className="rotate-90 transform cursor-pointer text-gray-400"
+          onClick={handleFlipOrder}
+        />
+      </div>
 
-			<SwapMetadata />
+      <TokenInput input={InputType.QUOTE} />
 
-			<button
-				className="w-full rounded-lg bg-blue-600 py-3 font-semibold text-white hover:bg-blue-700 disabled:pointer-events-none disabled:opacity-50"
-				disabled={step !== 'INPUT'}
-				onClick={step === 'GUEST' ? login : executeSwap}
-			>
-				{
-					{
-						GUEST: 'Connect Wallet',
-						INPUT: 'Swap',
-						CONFIRMING: 'Confirming',
-						CANCELED: 'Canceled',
-						EXECUTING: 'Executing',
-						SUCCESS: 'Success',
-						FAILED: 'Failed',
-					}[step]
-				}
-			</button>
-			{hash && (
-				<a
-					href={`https://sepolia.etherscan.io/tx/${hash}`}
-					target="_blank "
-					rel="noreferrer"
-					className="text-center text-sm text-blue-400 underline"
-				>
-					View transaction status on Etherscan
-				</a>
-			)}
-		</div>
-	)
+      <SwapMetadata />
+
+      <button
+        className="w-full rounded-lg bg-blue-600 py-3 font-semibold text-white hover:bg-blue-700 disabled:pointer-events-none disabled:opacity-50"
+        disabled={step !== 'INPUT'}
+        onClick={step === 'GUEST' ? login : executeSwap}
+      >
+        {
+          {
+            GUEST: 'Connect Wallet',
+            INPUT: 'Swap',
+            CONFIRMING: 'Confirming',
+            CANCELED: 'Canceled',
+            EXECUTING: 'Executing',
+            SUCCESS: 'Success',
+            FAILED: 'Failed',
+          }[step]
+        }
+      </button>
+      {hash && (
+        <a
+          href={`https://sepolia.etherscan.io/tx/${hash}`}
+          target="_blank "
+          rel="noreferrer"
+          className="text-center text-sm text-blue-400 underline"
+        >
+          View transaction status on Etherscan
+        </a>
+      )}
+    </div>
+  )
 }
 
 export default Swap
