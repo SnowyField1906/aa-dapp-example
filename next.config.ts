@@ -1,6 +1,6 @@
-import type { NextConfig } from 'next';
-import path from 'path';
+import type { NextConfig } from 'next'
+import path from 'path'
 
-const nextConfig: NextConfig = {};
+const nextConfig: NextConfig = {}
 
-export default nextConfig;
+export default nextConfig

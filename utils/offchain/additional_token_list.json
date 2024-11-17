@@ -1,11 +1,11 @@
 [
-  {
-    "name": "USDCoin",
-    "address": "0x6f14C02Fc1F78322cFd7d707aB90f18baD3B54f5",
-    "symbol": "USDC",
-    "decimals": 18,
-    "chainId": 11155111,
-    "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48/logo.png",
-    "extensions": {}
-  }
+    {
+        "name": "USDCoin",
+        "address": "0x6f14C02Fc1F78322cFd7d707aB90f18baD3B54f5",
+        "symbol": "USDC",
+        "decimals": 18,
+        "chainId": 11155111,
+        "logoURI": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48/logo.png",
+        "extensions": {}
+    }
 ]

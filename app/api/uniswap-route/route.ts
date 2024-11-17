@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server'
 
-import { Percent, TradeType } from '@uniswap/sdk-core';
+import { Percent, TradeType } from '@uniswap/sdk-core'
 
-import { CHAIN_ID, PROVIDER } from '@/utils/constants';
+import { CHAIN_ID, PROVIDER } from '@/utils/constants'
 
 // export const POST = async (req: NextRequest) => {
 //   const { tokenPair, valuePair, recipient, tradeType } = await req.json();

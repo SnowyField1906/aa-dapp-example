@@ -1,37 +1,37 @@
-import { computePoolAddress, Pool } from '@uniswap/v3-sdk';
+import { computePoolAddress, Pool } from '@uniswap/v3-sdk'
 
-import { FACTORY_ADDRESS, I_POOL_ABI, PROVIDER } from '../constants';
-import { PoolIdentifier } from '../types';
-import { Contract } from 'ethers';
+import { FACTORY_ADDRESS, I_POOL_ABI, PROVIDER } from '../constants'
+import { PoolIdentifier } from '../types'
+import { Contract } from 'ethers'
 
 export const getPoolList = async (): Promise<PoolIdentifier[]> => {
-  return [];
-};
+	return []
+}
 
 export const getPoolAddress = (params: PoolIdentifier): string => {
-  return computePoolAddress({
-    ...params,
-    factoryAddress: FACTORY_ADDRESS,
-  });
-};
+	return computePoolAddress({
+		...params,
+		factoryAddress: FACTORY_ADDRESS,
+	})
+}
 export const getPoolInfo = async (params: PoolIdentifier): Promise<Pool> => {
-  let poolAddress = getPoolAddress(params);
-  let poolContract = new Contract(poolAddress, I_POOL_ABI, PROVIDER);
+	const poolAddress = getPoolAddress(params)
+	const poolContract = new Contract(poolAddress, I_POOL_ABI, PROVIDER)
 
-  const [liquidity, slot0] = await Promise.all([
-    poolContract.liquidity(),
-    poolContract.slot0(),
-  ]);
+	const [liquidity, slot0] = await Promise.all([
+		poolContract.liquidity(),
+		poolContract.slot0(),
+	])
 
-  return new Pool(
-    params.tokenA,
-    params.tokenB,
-    params.fee,
-    slot0[0].toString(),
-    liquidity.toString(),
-    slot0[1]
-  );
-};
+	return new Pool(
+		params.tokenA,
+		params.tokenB,
+		params.fee,
+		slot0[0].toString(),
+		liquidity.toString(),
+		slot0[1]
+	)
+}
 
 /*
  * Generate route by Uniswap V3 SDK (manual implementation)
