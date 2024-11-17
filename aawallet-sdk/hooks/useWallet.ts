@@ -6,10 +6,10 @@ import {
     TransactionRequest,
     TransactionResponse,
 } from '../types'
-import { PROVIDER, RPC_URL } from '@utils/constants'
+import { PROVIDER } from '@utils/constants'
 import { getRevertReason } from '@utils/offchain/transaction'
 
-const TARGET_WALLET = 'http://localhost:3000/transaction_signing'
+const TARGET_WALLET = process.env.TARGET_WALLET as string
 
 const useWallet = (chain: EChain) => {
     type Chain = typeof chain
