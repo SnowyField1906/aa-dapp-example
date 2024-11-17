@@ -17,5 +17,21 @@
 ## Sample env
 
 ```env
-TARGET_WALLET=http://localhost:3000/transaction_signing
+NEXT_PUBLIC_TARGET_WALLET=http://localhost:3000/transaction_signing
+```
+
+### AAWallet SDK
+
+Source: [aawallet-sdk](./aawallet-sdk/index.ts)
+
+SDK provides a Context Wrapper (Provider) for the application with the following features states and methods:
+
+```ts
+export interface WalletContext {
+  userWallet: PublicUserWallet<EChain> | undefined;
+  login: login: () => void;
+  logout: () => void;
+  sendTransaction: (payload: TransactionRequest<EChain>) => Promise<TransactionResponse<EChain>>
+  waitTransaction: (hash: string) => Promise<TransactionReceipt<EChain>>
+}
 ```
