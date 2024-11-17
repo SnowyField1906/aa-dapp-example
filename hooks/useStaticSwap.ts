@@ -156,7 +156,7 @@ const useStaticSwap = () => {
                 setActiveInput(undefined)
                 setOnSwapLoadingPair({ ...onSwapLoadingPair, [oppositeInput]: false })
 
-                if (result?.errorCode) {
+                if ('errorCode' in result) {
                     setStaticSwapResult(undefined)
                     setInputValuePair({ [InputType.BASE]: '', [InputType.QUOTE]: '' })
 
