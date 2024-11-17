@@ -8,6 +8,7 @@ import {
 } from '@utils/offchain/tokens';
 import { useWalletContext } from '@aawallet-sdk';
 import { useStaticSwapContext } from '@providers/StaticSwapProvider';
+import { oppositeOf } from '@utils/offchain/base';
 
 const TokenInput = ({ input }: { input: InputType }) => {
   const { userWallet } = useWalletContext();
@@ -37,14 +38,16 @@ const TokenInput = ({ input }: { input: InputType }) => {
   };
 
   useEffect(() => {
-    let readableAmount = getReadableAmount(input);
-    setTempAmount(readableAmount);
+    (async () => {
+      const readableAmount = getReadableAmount(input);
+      setTempAmount(readableAmount);
 
-    Promise.all([
-      readableAmount && handleUpdateFiatPrice(input, readableAmount),
-      userWallet && handleUpdateBalance(input, userWallet.address),
-    ]);
-  }, [inputValuePair[input], selectedTokenPair[input], userWallet]);
+      await Promise.all([
+        readableAmount && handleUpdateFiatPrice(input, readableAmount),
+        userWallet && handleUpdateBalance(input, userWallet.address),
+      ]);
+    })();
+  }, [inputValuePair, selectedTokenPair, userWallet]);
 
   return (
     <div className="bg-gray-950 p-3 rounded-lg shadow-md select-none w-full">
@@ -103,20 +106,25 @@ const TokenInput = ({ input }: { input: InputType }) => {
 
       {isDropdownOpen && (
         <div className="absolute rounded-lg overflow-y-auto shadow-lg z-10 mt-1 bg-gray-900">
-          {tokenList.map((token) => (
-            <div
-              key={token.address}
-              className="flex items-center p-3 hover:bg-gray-700 cursor-pointer"
-              onClick={() => handleTokenChange(token)}
-            >
-              <img
-                src={certificatedLogoUri(token.logoURI)}
-                alt={token.symbol}
-                className="w-6 h-6 mr-2 rounded-full"
-              />
-              <span className="text-sm font-medium">{token.symbol}</span>
-            </div>
-          ))}
+          {tokenList
+            .filter(
+              (token) =>
+                token.symbol !== selectedTokenPair[oppositeOf(input)]?.symbol
+            )
+            .map((token) => (
+              <div
+                key={token.address}
+                className="flex items-center p-3 hover:bg-gray-700 cursor-pointer"
+                onClick={() => handleTokenChange(token)}
+              >
+                <img
+                  src={certificatedLogoUri(token.logoURI)}
+                  alt={token.symbol}
+                  className="w-6 h-6 mr-2 rounded-full"
+                />
+                <span className="text-sm font-medium">{token.symbol}</span>
+              </div>
+            ))}
         </div>
       )}
     </div>

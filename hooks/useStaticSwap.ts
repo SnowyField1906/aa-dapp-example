@@ -89,7 +89,6 @@ const useStaticSwap = () => {
         inputValuePair[input],
         selectedTokenPair[input]!.decimals
       );
-      console.log({ input: inputValuePair[input], readableAmount });
       return readableAmount;
     } catch {
       return '';
@@ -127,7 +126,6 @@ const useStaticSwap = () => {
   const handleUpdateBalance = async (input: InputType, address: string) => {
     try {
       let r = await getBalance(selectedTokenPair[input]!.address, address);
-      console.log({ r, address, token: selectedTokenPair[input]!.address });
       setBalancePair({ ...balancePair, [input]: r });
     } catch {
       setBalancePair({ ...balancePair, [input]: '' });
@@ -196,16 +194,16 @@ const useStaticSwap = () => {
   }, [selectedTokenPair, inputValuePair, activeInput]);
 
   useEffect(() => {
-    if (!swapMetadata || !staticSwapResult) return;
+    if (!staticSwapResult || !swapMetadata.tradeType) return;
 
     setSwapMetadata({
       ...swapMetadata,
       minimumReceived: (
-        parseFloat(inputValuePair[InputType.QUOTE]!) *
+        parseFloat(getReadableAmount(InputType.QUOTE)) *
         (1 - swapConfigs.slippage / 100)
       ).toString(),
       maximumSpent: (
-        parseFloat(inputValuePair[InputType.BASE]!) *
+        parseFloat(getReadableAmount(InputType.BASE)) *
         (1 + swapConfigs.slippage / 100)
       ).toString(),
       gweiFee: parseReadableAmount(
@@ -216,8 +214,8 @@ const useStaticSwap = () => {
         9
       ),
       bestPrice: (
-        parseFloat(inputValuePair[InputType.QUOTE]!) /
-        parseFloat(inputValuePair[InputType.BASE]!)
+        parseFloat(getReadableAmount(InputType.QUOTE)) /
+        parseFloat(getReadableAmount(InputType.BASE))
       ).toString(),
       gasToPay: (
         Number(staticSwapResult!.gasUseEstimate) *

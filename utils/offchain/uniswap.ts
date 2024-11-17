@@ -16,16 +16,31 @@ export const formatFee = (fee: number): string => {
   return truncateDecimals(`${fee / 10000}`, 2) + '%';
 };
 
-export const constructPath = (hops: UniswapStaticRoute[]): string => {
-  const packTypes = ['address'];
-  const packValues = [hops[0].tokenIn.address];
+export const constructPath = (
+  hops: UniswapStaticRoute[],
+  tradeType: TradeType
+): string => {
+  if (tradeType === TradeType.EXACT_INPUT) {
+    const packTypes = ['address'];
+    const packValues = [hops[0].tokenIn.address];
 
-  for (const { fee, tokenOut } of hops) {
-    packTypes.push('uint24', 'address');
-    packValues.push(fee, tokenOut.address);
+    for (const { fee, tokenOut } of hops) {
+      packTypes.push('uint24', 'address');
+      packValues.push(fee, tokenOut.address);
+    }
+
+    return solidityPacked(packTypes, packValues);
+  } else {
+    const packTypes = ['address'];
+    const packValues = [hops[hops.length - 1].tokenOut.address];
+
+    for (const { fee, tokenIn } of hops.slice().reverse()) {
+      packTypes.push('uint24', 'address');
+      packValues.push(fee, tokenIn.address);
+    }
+
+    return solidityPacked(packTypes, packValues);
   }
-
-  return solidityPacked(packTypes, packValues);
 };
 
 export const parseRouteString = (

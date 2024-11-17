@@ -10,11 +10,11 @@ import { I_ERC20_ABI, I_ROUTER_ABI, ROUTER_ADDRESS } from '@utils/constants';
 import { getAllowance } from '@utils/onchain/tokens';
 import { TradeType } from '@uniswap/sdk-core';
 import { constructPath } from '@utils/offchain/uniswap';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ethers } from 'ethers';
 
 const Swap = () => {
-  const { userWallet, login, transactionResponse, sendTransaction } =
+  const { userWallet, login, sendTransaction, waitTransaction } =
     useWalletContext();
   const {
     selectedTokenPair,
@@ -22,11 +22,21 @@ const Swap = () => {
     swapMetadata,
     staticSwapResult,
     handleFlipOrder,
+    handleUpdateBalance,
   } = useStaticSwapContext();
-  const [loading, setLoading] = useState(false);
+  const [step, setStep] = useState<
+    | 'GUEST'
+    | 'INPUT'
+    | 'CONFIRMING'
+    | 'CANCELED'
+    | 'EXECUTING'
+    | 'SUCCESS'
+    | 'FAILED'
+  >(userWallet ? 'INPUT' : 'GUEST');
+  const [hash, setHash] = useState<string>();
 
   const executeSwap = async () => {
-    setLoading(true);
+    setStep('CONFIRMING');
     const hops = staticSwapResult!.route.flat();
 
     const uniqueAddresses: Address[] = Array.from(
@@ -63,23 +73,22 @@ const Swap = () => {
         ? 'exactInput'
         : 'exactOutput',
       [
-        swapMetadata.tradeType === TradeType.EXACT_INPUT
-          ? {
-              path: constructPath(hops),
-              recipient: userWallet!.address,
-              amountIn: inputValuePair[InputType.BASE],
-              amountOutMinimum: '1',
-            }
-          : {
-              path: constructPath(hops),
-              recipient: userWallet!.address,
-              amountOut: inputValuePair[InputType.QUOTE],
-              amountInMaximum: '1',
-            },
+        [
+          constructPath(hops, swapMetadata.tradeType),
+          userWallet!.address,
+          inputValuePair[
+            swapMetadata.tradeType === TradeType.EXACT_INPUT
+              ? InputType.BASE
+              : InputType.QUOTE
+          ],
+          swapMetadata.tradeType === TradeType.EXACT_INPUT
+            ? '1'
+            : '115792089237316195423570985008687907853269984665640564039457584007913129639935',
+        ],
       ]
     );
 
-    await sendTransaction({
+    let response = await sendTransaction({
       from: userWallet!.address,
       to: ROUTER_ADDRESS,
       gasLimit: (Number(staticSwapResult!.gasUseEstimate) * 2).toString(),
@@ -87,10 +96,38 @@ const Swap = () => {
       data,
     });
 
-    setLoading(false);
+    console.log('Transaction response: ', response);
+
+    if (response.success) {
+      setStep('EXECUTING');
+      setHash(response.signed.hash);
+      const receipt = await waitTransaction(response.signed.hash);
+      console.log('Transaction receipt: ', receipt);
+      setStep(receipt.success ? 'SUCCESS' : 'FAILED');
+    } else {
+      setStep('CANCELED');
+    }
+
+    await handleUpdateBalance(InputType.BASE, userWallet!.address);
+    await handleUpdateBalance(InputType.QUOTE, userWallet!.address);
   };
 
-  console.log(transactionResponse);
+  const isFinalStep =
+    step === 'CANCELED' ||
+    step === 'CONFIRMING' ||
+    step === 'SUCCESS' ||
+    step === 'FAILED';
+
+  useEffect(() => {
+    if (isFinalStep) {
+      setStep('INPUT');
+      setHash(undefined);
+    }
+  }, [staticSwapResult]);
+  useEffect(() => {
+    setStep(userWallet ? 'INPUT' : 'GUEST');
+    setHash(undefined);
+  }, [userWallet]);
 
   return (
     <div className="bg-gray-900 text-white p-6 rounded-lg w-2xl w-2xl mx-auto shadow-lg flex flex-col gap-6">
@@ -112,12 +149,32 @@ const Swap = () => {
       <SwapMetadata />
 
       <button
-        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg disabled:opacity-50"
-        disabled={loading}
-        onClick={userWallet ? executeSwap : login}
+        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg disabled:opacity-50 disabled:pointer-events-none"
+        disabled={step !== 'INPUT'}
+        onClick={step === 'GUEST' ? login : executeSwap}
       >
-        {userWallet ? 'Swap' : 'Connect Wallet'}
+        {
+          {
+            GUEST: 'Connect Wallet',
+            INPUT: 'Swap',
+            CONFIRMING: 'Confirming',
+            CANCELED: 'Canceled',
+            EXECUTING: 'Executing',
+            SUCCESS: 'Success',
+            FAILED: 'Failed',
+          }[step]
+        }
       </button>
+      {hash && (
+        <a
+          href={`https://sepolia.etherscan.io/tx/${hash}`}
+          target="_blank "
+          rel="noreferrer"
+          className="text-blue-400 underline text-center text-sm"
+        >
+          View transaction status on Etherscan
+        </a>
+      )}
     </div>
   );
 };

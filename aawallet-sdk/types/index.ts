@@ -5,6 +5,7 @@ import {
 import {
   TransactionRequest as EthereumTransactionRequest,
   TransactionResponse as EthereumTransactionResponse,
+  TransactionReceipt as EthereumTransactionReceipt,
 } from 'ethers';
 
 export enum EChain {
@@ -29,14 +30,27 @@ export type TransferTokenPayload = {
   tokenAddress: string;
 };
 
-export type TransactionResponse<T extends EChain = EChain> = {
-  success: boolean;
-  signed?: T extends EChain.ETHEREUM
-    ? EthereumTransactionResponse
-    : T extends EChain.SOLANA
-    ? string // ? SolanaTransactionResponse
-    : never;
-};
+export type TransactionResponse<T extends EChain = EChain> =
+  | {
+      success: true;
+      signed: T extends EChain.ETHEREUM
+        ? EthereumTransactionResponse
+        : T extends EChain.SOLANA
+        ? string // ? SolanaTransactionResponse
+        : never;
+    }
+  | { success: false; error: Error };
+
+export type TransactionReceipt<T extends EChain = EChain> =
+  | {
+      success: true;
+      receipt: T extends EChain.ETHEREUM
+        ? EthereumTransactionReceipt
+        : T extends EChain.SOLANA
+        ? SolanaTransactionResponse
+        : never;
+    }
+  | { success: false; error: Error };
 
 export type PublicUserWallet<T extends EChain = EChain> = {
   address: string;

@@ -15,9 +15,7 @@ const SwapMetadata = () => {
     swapMetadata,
     swapConfigs,
     parseOffChainToken,
-    getReadableAmount,
     selectedTokenPair,
-    inputValuePair,
     onSwapLoadingPair,
     staticSwapResult,
   } = useStaticSwapContext();
@@ -53,12 +51,10 @@ const SwapMetadata = () => {
     return null;
   }
 
-  let parsedRoute: ParsedRoute[] = parseRouteString(
+  const parsedRoute: ParsedRoute[] = parseRouteString(
     staticSwapResult.routeString,
     staticSwapResult.route
   );
-
-  console.log(parsedRoute);
 
   return (
     <div className="bg-gray-800 p-4 rounded-lg text-sm space-y-2">
