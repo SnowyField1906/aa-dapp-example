@@ -7,7 +7,7 @@ AAWallet SDK provides a Context Wrapper (Provider) for the application to intera
 ```ts
 export interface WalletContext {
   userWallet: PublicUserWallet<EChain> | undefined;
-  login: login: () => void;
+  login: () => void;
   logout: () => void;
   sendTransaction: (payload: TransactionRequest<EChain>) => Promise<TransactionResponse<EChain>>
   waitTransaction: (hash: string) => Promise<TransactionReceipt<EChain>>
