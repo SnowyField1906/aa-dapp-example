@@ -2,7 +2,7 @@
 
 - [x] Login + logout
 - [x] Sign transaction
-- [x] 4 swap strategies (ExactInZeroForOne, ExactOutZeroForOne, ExactInForOneForZero, ExactOutForOneForZero)
+- [x] 4 swap strategies (ExactInZeroForOne, ExactOutZeroForOne, ExactInOneForZero, ExactOutOneForZero)
 - [x] Multi hops swap (one route only)
 - [x] Handle all* wallets + transaction errors (transaction failures, singing failures, static swap failures)
 - [x] Readable transaction revert messages
