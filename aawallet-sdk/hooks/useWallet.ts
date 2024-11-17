@@ -8,7 +8,7 @@ import {
 } from '../types';
 import { PROVIDER } from '@utils/constants';
 
-const TARGET_WALLET = 'http://localhost:4040/transaction_signing';
+const TARGET_WALLET = 'http://localhost:3000/transaction_signing';
 
 const useWallet = (chain: EChain) => {
   type Chain = typeof chain;
