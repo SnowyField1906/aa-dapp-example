@@ -142,10 +142,22 @@ const useStaticSwap = () => {
     }
 
     const handleUpdateMetadata = (tradeType: TradeType, result: UniswapStaticSwapResponse) => {
-        const readableQuote = parseReadableAmount(
-            result.quote,
-            selectedTokenPair[InputType.QUOTE]!.decimals
-        )
+        const [readableQuote, readableBase] =
+            tradeType === TradeType.EXACT_INPUT
+                ? [
+                      parseReadableAmount(
+                          result.quote,
+                          selectedTokenPair[InputType.QUOTE]!.decimals
+                      ),
+                      getReadableAmount(InputType.BASE),
+                  ]
+                : [
+                      getReadableAmount(InputType.QUOTE),
+                      parseReadableAmount(
+                          result.quote,
+                          selectedTokenPair[InputType.BASE]!.decimals
+                      ),
+                  ]
 
         setSwapMetadata({
             tradeType,
@@ -153,17 +165,12 @@ const useStaticSwap = () => {
                 parseFloat(readableQuote) *
                 (1 - swapConfigs.slippage / 100)
             ).toString(),
-            maximumSpent: (
-                parseFloat(getReadableAmount(InputType.BASE)) *
-                (1 + swapConfigs.slippage / 100)
-            ).toString(),
+            maximumSpent: (parseFloat(readableBase) * (1 + swapConfigs.slippage / 100)).toString(),
             gweiFee: parseReadableAmount(
                 (BigInt(result!.gasUseEstimate) * BigInt(result!.gasPriceWei)).toString(),
                 9
             ),
-            bestPrice: (
-                parseFloat(readableQuote) / parseFloat(getReadableAmount(InputType.BASE))
-            ).toString(),
+            bestPrice: (parseFloat(readableQuote) / parseFloat(readableBase)).toString(),
             gasToPay: (
                 Number(result!.gasUseEstimate) *
                 (1 + swapConfigs.gasBuffer / 100)
