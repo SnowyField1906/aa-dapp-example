@@ -141,6 +141,36 @@ const useStaticSwap = () => {
         }
     }
 
+    const handleUpdateMetadata = (tradeType: TradeType, result: UniswapStaticSwapResponse) => {
+        const readableQuote = parseReadableAmount(
+            result.quote,
+            selectedTokenPair[InputType.QUOTE]!.decimals
+        )
+
+        setSwapMetadata({
+            tradeType,
+            minimumReceived: (
+                parseFloat(readableQuote) *
+                (1 - swapConfigs.slippage / 100)
+            ).toString(),
+            maximumSpent: (
+                parseFloat(getReadableAmount(InputType.BASE)) *
+                (1 + swapConfigs.slippage / 100)
+            ).toString(),
+            gweiFee: parseReadableAmount(
+                (BigInt(result!.gasUseEstimate) * BigInt(result!.gasPriceWei)).toString(),
+                9
+            ),
+            bestPrice: (
+                parseFloat(readableQuote) / parseFloat(getReadableAmount(InputType.BASE))
+            ).toString(),
+            gasToPay: (
+                Number(result!.gasUseEstimate) *
+                (1 + swapConfigs.gasBuffer / 100)
+            ).toString(),
+        })
+    }
+
     const handleSwap = useCallback(
         async (tradeType: TradeType, updatedInput: InputType) => {
             const oppositeInput = oppositeOf(updatedInput)
@@ -162,39 +192,16 @@ const useStaticSwap = () => {
 
                     alert('No route found for the selected pair')
                 } else {
-                    setSwapMetadata({
-                        tradeType,
-                        minimumReceived: (
-                            parseFloat(getReadableAmount(InputType.QUOTE)) *
-                            (1 - swapConfigs.slippage / 100)
-                        ).toString(),
-                        maximumSpent: (
-                            parseFloat(getReadableAmount(InputType.BASE)) *
-                            (1 + swapConfigs.slippage / 100)
-                        ).toString(),
-                        gweiFee: parseReadableAmount(
-                            (
-                                BigInt(result!.gasUseEstimate) * BigInt(result!.gasPriceWei)
-                            ).toString(),
-                            9
-                        ),
-                        bestPrice: (
-                            parseFloat(getReadableAmount(InputType.QUOTE)) /
-                            parseFloat(getReadableAmount(InputType.BASE))
-                        ).toString(),
-                        gasToPay: (
-                            Number(result!.gasUseEstimate) *
-                            (1 + swapConfigs.gasBuffer / 100)
-                        ).toString(),
-                    })
-
                     setStaticSwapResult(result)
                     setInputValuePair({ ...inputValuePair, [oppositeInput]: result.quote })
+
+                    handleUpdateMetadata(tradeType, result)
                 }
             } catch {
                 setInputValuePair({ ...inputValuePair, [oppositeInput]: '' })
             }
         },
+
         [selectedTokenPair, inputValuePair]
     )
 
@@ -205,6 +212,12 @@ const useStaticSwap = () => {
             handleSwap(tradeType, activeInput)
         }
     }, [selectedTokenPair, inputValuePair, activeInput])
+
+    useEffect(() => {
+        if (staticSwapResult && swapMetadata.tradeType) {
+            handleUpdateMetadata(swapMetadata.tradeType, staticSwapResult)
+        }
+    }, [swapConfigs])
 
     return {
         // tokens

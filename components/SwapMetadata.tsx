@@ -43,7 +43,7 @@ const SwapMetadata = () => {
     )
   }
 
-  if (!staticSwapResult) {
+  if (!staticSwapResult || !swapMetadata.bestPrice) {
     return null
   }
 
