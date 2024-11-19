@@ -109,7 +109,7 @@ const useWallet = (chain: EChain) => {
 
         const handleMessage = ({ data: { type, ...res } }: MessageEvent) => {
             if (type === 'READY') {
-                walletWindow.postMessage({ type: 'DERIVE_ADDRESS_REQUEST' }, '*')
+                walletWindow.postMessage({ type: 'DERIVE_ADDRESS_REQUEST', chain }, '*')
             }
             if (type === 'DERIVE_ADDRESS_RESPONSE') {
                 setUserWallet(res)
