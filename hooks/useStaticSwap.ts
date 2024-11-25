@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import {
+    computeMaxSpent,
+    computeMinReceived,
     getTokenFiatPrice,
     getTokenList,
     parseOnChainTokenPair,
@@ -46,8 +48,10 @@ const useStaticSwap = () => {
     const [activeInput, setActiveInput] = useState<InputType>()
     const [staticSwapResult, setStaticSwapResult] = useState<UniswapStaticSwapResponse>()
     const [swapConfigs, setSwapConfigs] = useState<SwapConfigs>({
-        slippage: 30,
-        gasBuffer: 10,
+        slippage: 10, // 10% slippage tolerance
+        gasBuffer: 100, // 100% gas buffer
+        minSplits: 1, // minimum route splits
+        maxSplits: 3, // maximum route splits
     })
     const [swapMetadata, setSwapMetadata] = useState<SwapMetadata>({
         minimumReceived: '',
@@ -141,43 +145,6 @@ const useStaticSwap = () => {
         }
     }
 
-    const handleUpdateMetadata = (tradeType: TradeType, result: UniswapStaticSwapResponse) => {
-        const [readableQuote, readableBase] =
-            tradeType === TradeType.EXACT_INPUT
-                ? [
-                      parseReadableAmount(
-                          result.quote,
-                          selectedTokenPair[InputType.QUOTE]!.decimals
-                      ),
-                      getReadableAmount(InputType.BASE),
-                  ]
-                : [
-                      getReadableAmount(InputType.QUOTE),
-                      parseReadableAmount(
-                          result.quote,
-                          selectedTokenPair[InputType.BASE]!.decimals
-                      ),
-                  ]
-
-        setSwapMetadata({
-            tradeType,
-            minimumReceived: (
-                parseFloat(readableQuote) *
-                (1 - swapConfigs.slippage / 100)
-            ).toString(),
-            maximumSpent: (parseFloat(readableBase) * (1 + swapConfigs.slippage / 100)).toString(),
-            gweiFee: parseReadableAmount(
-                (BigInt(result!.gasUseEstimate) * BigInt(result!.gasPriceWei)).toString(),
-                9
-            ),
-            bestPrice: (parseFloat(readableQuote) / parseFloat(readableBase)).toString(),
-            gasToPay: (
-                Number(result!.gasUseEstimate) *
-                (1 + swapConfigs.gasBuffer / 100)
-            ).toString(),
-        })
-    }
-
     const handleSwap = useCallback(
         async (tradeType: TradeType, updatedInput: InputType) => {
             const oppositeInput = oppositeOf(updatedInput)
@@ -188,7 +155,9 @@ const useStaticSwap = () => {
                 const result = await staticSwap(
                     parseOnChainTokenPair(unwrapPair(selectedTokenPair)),
                     inputValuePair,
-                    tradeType
+                    tradeType,
+                    swapConfigs.minSplits,
+                    swapConfigs.maxSplits
                 )
                 setActiveInput(undefined)
                 setOnSwapLoadingPair({ ...onSwapLoadingPair, [oppositeInput]: false })
@@ -202,7 +171,30 @@ const useStaticSwap = () => {
                     setStaticSwapResult(result)
                     setInputValuePair({ ...inputValuePair, [oppositeInput]: result.quote })
 
-                    handleUpdateMetadata(tradeType, result)
+                    const [quote, base] =
+                        swapMetadata.tradeType === TradeType.EXACT_INPUT
+                            ? [result.quote, inputValuePair[InputType.BASE]]
+                            : [inputValuePair[InputType.QUOTE], result.quote]
+
+                    const gasToPay = computeMaxSpent(result.gasUseEstimate, swapConfigs.gasBuffer)
+
+                    setSwapMetadata({
+                        tradeType,
+                        bestPrice: (parseFloat(quote) / parseFloat(base)).toString(),
+                        minimumReceived: parseReadableAmount(
+                            computeMinReceived(quote, swapConfigs.slippage),
+                            selectedTokenPair[InputType.QUOTE]!.decimals
+                        ),
+                        maximumSpent: parseReadableAmount(
+                            computeMaxSpent(base, swapConfigs.slippage),
+                            selectedTokenPair[InputType.BASE]!.decimals
+                        ),
+                        gasToPay: gasToPay.toString(),
+                        gweiFee: parseReadableAmount(
+                            (BigInt(gasToPay) * BigInt(staticSwapResult!.gasPriceWei)).toString(),
+                            9
+                        ),
+                    })
                 }
             } catch {
                 setInputValuePair({ ...inputValuePair, [oppositeInput]: '' })
@@ -218,13 +210,7 @@ const useStaticSwap = () => {
                 activeInput === InputType.BASE ? TradeType.EXACT_INPUT : TradeType.EXACT_OUTPUT
             handleSwap(tradeType, activeInput)
         }
-    }, [selectedTokenPair, inputValuePair, activeInput])
-
-    useEffect(() => {
-        if (staticSwapResult && swapMetadata.tradeType) {
-            handleUpdateMetadata(swapMetadata.tradeType, staticSwapResult)
-        }
-    }, [swapConfigs])
+    }, [selectedTokenPair, inputValuePair, activeInput, swapConfigs])
 
     return {
         // tokens

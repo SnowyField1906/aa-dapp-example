@@ -1,19 +1,19 @@
 'use client'
 
 import { FaCog, FaExchangeAlt } from 'react-icons/fa'
-import { Address, InputType } from '@utils/types'
+import { Address, InputType, UniswapStaticHop } from '@utils/types'
 import TokenInput from './TokenInput'
 import SwapMetadata from './SwapMetadata'
 import { useStaticSwapContext } from '@providers/StaticSwapProvider'
 import { useWalletContext } from '@aawallet-sdk'
-import { I_ERC20_ABI, I_ROUTER_ABI, ROUTER_ADDRESS } from '@utils/constants'
+import { I_ERC20_ABI, I_ROUTER_ABI, MAX_UINT256, ROUTER_ADDRESS } from '@utils/constants'
 import { getAllowance } from '@utils/onchain/tokens'
 import { TradeType } from '@uniswap/sdk-core'
 import { constructPath } from '@utils/offchain/uniswap'
 import { useEffect, useState } from 'react'
 import { ethers } from 'ethers'
 import { EChain, TransactionResponse } from '@aawallet-sdk/types'
-import { parseTokenValue } from '@utils/offchain/tokens'
+import { computeMaxSpent, computeMinReceived, parseTokenValue } from '@utils/offchain/tokens'
 
 const Swap = () => {
   const { userWallet, login, sendTransaction, waitTransaction } = useWalletContext()
@@ -21,19 +21,29 @@ const Swap = () => {
     selectedTokenPair,
     inputValuePair,
     swapMetadata,
+    swapConfigs,
     staticSwapResult,
     handleFlipOrder,
     handleUpdateBalance,
   } = useStaticSwapContext()
   const [step, setStep] = useState<
-    'GUEST' | 'INPUT' | 'CONFIRMING' | 'CANCELED' | 'EXECUTING' | 'SUCCESS' | 'FAILED'
+    | 'GUEST'
+    | 'INPUT'
+    | 'CONFIRMING_APPROVE'
+    | 'CONFIRMING_SWAP'
+    | 'CANCELED'
+    | 'APPROVING'
+    | 'SWAPPING'
+    | 'SUCCESS'
+    | 'FAILED'
   >(userWallet ? 'INPUT' : 'GUEST')
   const [hash, setHash] = useState<string>()
 
   const executeSwap = async () => {
-    setStep('CONFIRMING')
-    const hops = staticSwapResult!.route.flat()
+    setStep('CONFIRMING_APPROVE')
+    const hops: UniswapStaticHop[] = staticSwapResult!.route.flat()
 
+    /// Check if all tokens are approved
     const uniqueAddresses: Address[] = Array.from(
       new Set(hops.map((hop) => [hop.tokenIn.address, hop.tokenOut.address]).flat())
     )
@@ -45,56 +55,68 @@ const Swap = () => {
       )
     ).then((addresses) => addresses.filter((address) => address !== ''))
 
+    /// Approve all tokens
+    let approved = true
     for (const address of approvalsNeeded) {
       const contractInterface = new ethers.Interface(I_ERC20_ABI)
-      const data = contractInterface.encodeFunctionData('approve', [
-        ROUTER_ADDRESS,
-        '115792089237316195423570985008687907853269984665640564039457584007913129639935',
-      ])
+      const data = contractInterface.encodeFunctionData('approve', [ROUTER_ADDRESS, MAX_UINT256])
       await sendTransaction({
         from: userWallet!.address,
         to: address,
         gasLimit: '100000',
         value: '0',
         data,
+      }).catch(() => {
+        approved = false
       })
     }
+    if (!approved) {
+      alert('Not all tokens were approved')
+      setStep('FAILED')
+      return
+    }
 
+    setStep('CONFIRMING_SWAP')
+
+    /// Group routes into one for multi-call
+    const calls: string[] = []
     const contractInterface = new ethers.Interface(I_ROUTER_ABI)
-    const data = contractInterface.encodeFunctionData(
-      swapMetadata.tradeType === TradeType.EXACT_INPUT ? 'exactInput' : 'exactOutput',
-      [
-        [
-          constructPath(hops, swapMetadata.tradeType),
-          userWallet!.address,
-          inputValuePair[
-            swapMetadata.tradeType === TradeType.EXACT_INPUT ? InputType.BASE : InputType.QUOTE
-          ],
-          swapMetadata.tradeType === TradeType.EXACT_INPUT
-            ? parseTokenValue(
-                swapMetadata.minimumReceived,
-                selectedTokenPair[InputType.QUOTE]!.decimals
-              )
-            : parseTokenValue(
-                swapMetadata.maximumSpent,
-                selectedTokenPair[InputType.BASE]!.decimals
-              ),
-        ],
-      ]
-    )
 
+    for (const route of staticSwapResult!.route) {
+      const path = constructPath(route, swapMetadata.tradeType)
+      const [tokenIn, tokenOut] = route.reduce(
+        (acc, hop) => [acc[0] + BigInt(hop.amountIn), acc[1] + BigInt(hop.amountOut)],
+        [BigInt(0), BigInt(0)]
+      )
+
+      if (swapMetadata.tradeType === TradeType.EXACT_INPUT) {
+        const exactIn = tokenIn.toString()
+        const minReceived = computeMinReceived(tokenOut.toString(), swapConfigs.slippage)
+
+        const args = [path, userWallet!.address, exactIn, minReceived]
+        calls.push(contractInterface.encodeFunctionData('exactInput', [args]))
+      } else {
+        const exactOut = tokenOut.toString()
+        const maxSpent = computeMaxSpent(tokenIn.toString(), swapConfigs.slippage)
+
+        const args = [path, userWallet!.address, exactOut.toString(), maxSpent.toString()]
+        calls.push(contractInterface.encodeFunctionData('exactOutput', [args]))
+      }
+    }
+
+    /// Execute multi-call
     const response = (await sendTransaction({
       from: userWallet!.address,
       to: ROUTER_ADDRESS,
-      gasLimit: (Number(staticSwapResult!.gasUseEstimate) * 2).toString(),
+      gasLimit: swapMetadata.gasToPay,
       value: '0',
-      data,
+      data: contractInterface.encodeFunctionData('multicall(bytes[])', [calls]),
     })) as TransactionResponse<EChain.ETHEREUM>
 
     console.log('Transaction response: ', response)
 
     if (response.success) {
-      setStep('EXECUTING')
+      setStep('SWAPPING')
       setHash(response.signed.hash)
       const receipt = await waitTransaction(response.signed.hash)
 
@@ -116,14 +138,11 @@ const Swap = () => {
     ])
   }
 
-  const isFinalStep =
-    step === 'CANCELED' || step === 'CONFIRMING' || step === 'SUCCESS' || step === 'FAILED'
+  const isFinalStep = step === 'CANCELED' || step === 'SUCCESS' || step === 'FAILED'
 
   useEffect(() => {
-    if (isFinalStep) {
-      setStep('INPUT')
-      setHash(undefined)
-    }
+    setStep('INPUT')
+    setHash(undefined)
   }, [staticSwapResult])
   useEffect(() => {
     setStep(userWallet ? 'INPUT' : 'GUEST')
@@ -158,9 +177,11 @@ const Swap = () => {
           {
             GUEST: 'Connect Wallet',
             INPUT: 'Swap',
-            CONFIRMING: 'Confirming',
+            CONFIRMING_APPROVE: 'Confirming for approval',
+            CONFIRMING_SWAP: 'Confirming for swap',
             CANCELED: 'Canceled',
-            EXECUTING: 'Executing',
+            APPROVING: 'Approving token',
+            SWAPPING: 'Executing swap',
             SUCCESS: 'Success',
             FAILED: 'Failed',
           }[step]

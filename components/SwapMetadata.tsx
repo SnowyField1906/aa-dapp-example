@@ -1,8 +1,7 @@
 import { useStaticSwapContext } from '@providers/StaticSwapProvider'
 import { TradeType } from '@uniswap/sdk-core'
-import { allFilled } from '@utils/offchain/base'
-import { certificatedLogoUri, parseReadableAmount, truncateDecimals } from '@utils/offchain/tokens'
-import { formatFee, parseRouteString } from '@utils/offchain/uniswap'
+import { certificatedLogoUri, truncateDecimals } from '@utils/offchain/tokens'
+import { formatFee, parseRoute } from '@utils/offchain/uniswap'
 import { InputType, ParsedRoute } from '@utils/types'
 import { Fragment } from 'react'
 
@@ -47,7 +46,7 @@ const SwapMetadata = () => {
     return null
   }
 
-  const parsedRoute: ParsedRoute[] = parseRouteString(
+  const parsedRoute: ParsedRoute[] = parseRoute(
     staticSwapResult.routeString,
     staticSwapResult.route
   )

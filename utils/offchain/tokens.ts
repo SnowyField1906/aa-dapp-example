@@ -90,3 +90,11 @@ export const getTokenFiatPrice = async (
         return '0'
     }
 }
+
+export const computeMinReceived = (amountOut: string, slippage: number): string => {
+    return (BigInt(amountOut) - (BigInt(amountOut) * BigInt(slippage)) / BigInt(100)).toString()
+}
+
+export const computeMaxSpent = (amountIn: string, slippage: number): string => {
+    return (BigInt(amountIn) + (BigInt(amountIn) * BigInt(slippage)) / BigInt(100)).toString()
+}
