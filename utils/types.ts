@@ -41,12 +41,14 @@ export type SwapConfigs = {
     gasBuffer: number
     minSplits: number
     maxSplits: number
+    maxSwapsPerPath: number
 }
 export type SwapMetadata = {
     minimumReceived: string
     maximumSpent: string
     gasToPay: string
-    gweiFee: string
+    ethFee: string
+    usdFee: string
     bestPrice: string
     tradeType: TradeType
 }
@@ -87,6 +89,9 @@ export type UniswapStaticSwapRequest = {
     tokenOutChainId: number
     amount: string
     type: 'exactIn' | 'exactOut'
+    minSplits: number
+    maxSplits: number
+    maxSwapsPerPath: number
 }
 export type UniswapStaticSwapResponse = {
     blockNumber: string

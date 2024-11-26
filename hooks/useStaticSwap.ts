@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import {
     computeMaxSpent,
-    computeMinReceived,
+    computeMaxSpentFloat,
+    computeMinReceivedFloat,
     getTokenFiatPrice,
     getTokenList,
     parseOnChainTokenPair,
@@ -50,17 +51,21 @@ const useStaticSwap = () => {
     const [swapConfigs, setSwapConfigs] = useState<SwapConfigs>({
         slippage: 10, // 10% slippage tolerance
         gasBuffer: 100, // 100% gas buffer
-        minSplits: 1, // minimum route splits
-        maxSplits: 3, // maximum route splits
+        minSplits: 1, // minimum path/route
+        maxSplits: 3, // maximum path/route
+        maxSwapsPerPath: 3, // maximum swaps per path/route
     })
     const [swapMetadata, setSwapMetadata] = useState<SwapMetadata>({
         minimumReceived: '',
         maximumSpent: '',
         gasToPay: '',
-        gweiFee: '',
+        ethFee: '',
+        usdFee: '',
         bestPrice: '',
         tradeType: TradeType.EXACT_INPUT,
     })
+
+    const prevActiveInput = useRef<InputType>()
 
     useEffect(() => {
         ;(async () => {
@@ -114,7 +119,7 @@ const useStaticSwap = () => {
     }, [selectedTokenPair, fiatPricePair, balancePair, inputValuePair])
 
     const handleUpdateToken = (input: InputType, token: OffChainToken) => {
-        setSelectedTokenPair({ ...selectedTokenPair, [input]: token })
+        setSelectedTokenPair((prev) => ({ ...prev, [input]: token }))
         if (inputValuePair[oppositeOf(input)]) {
             setActiveInput(oppositeOf(input))
         }
@@ -122,45 +127,47 @@ const useStaticSwap = () => {
     const handleUpdateBalance = async (input: InputType, address: string) => {
         try {
             const r = await getBalance(selectedTokenPair[input]!.address, address)
-            setBalancePair({ ...balancePair, [input]: r })
+            setBalancePair((prev) => ({ ...prev, [input]: r }))
         } catch {
-            setBalancePair({ ...balancePair, [input]: '' })
+            setBalancePair((prev) => ({ ...prev, [input]: '' }))
         }
     }
     const handleUpdateFiatPrice = async (input: InputType, amount: string) => {
         try {
             const r = await getTokenFiatPrice(selectedTokenPair[input]!.symbol, amount)
-            setFiatPricePair({ ...fiatPricePair, [input]: r })
+            setFiatPricePair((prev) => ({ ...prev, [input]: r }))
         } catch {
-            setFiatPricePair({ ...fiatPricePair, [input]: '' })
+            setFiatPricePair((prev) => ({ ...prev, [input]: '' }))
         }
     }
     const handleUpdateInputValue = (input: InputType, amount: string) => {
         try {
             const r = parseTokenValue(amount, selectedTokenPair[input]!.decimals)
-            setInputValuePair({ ...inputValuePair, [input]: r })
+            setInputValuePair((prev) => ({ ...prev, [input]: r }))
             setActiveInput(input)
         } catch {
-            setInputValuePair({ ...inputValuePair, [input]: '' })
+            setInputValuePair((prev) => ({ ...prev, [input]: '' }))
         }
     }
 
     const handleSwap = useCallback(
         async (tradeType: TradeType, updatedInput: InputType) => {
+            prevActiveInput.current = updatedInput
             const oppositeInput = oppositeOf(updatedInput)
 
             try {
-                setOnSwapLoadingPair({ ...onSwapLoadingPair, [oppositeInput]: true })
+                setOnSwapLoadingPair((prev) => ({ ...prev, [oppositeInput]: true }))
 
                 const result = await staticSwap(
                     parseOnChainTokenPair(unwrapPair(selectedTokenPair)),
                     inputValuePair,
                     tradeType,
                     swapConfigs.minSplits,
-                    swapConfigs.maxSplits
+                    swapConfigs.maxSplits,
+                    swapConfigs.maxSwapsPerPath
                 )
                 setActiveInput(undefined)
-                setOnSwapLoadingPair({ ...onSwapLoadingPair, [oppositeInput]: false })
+                setOnSwapLoadingPair((prev) => ({ ...prev, [oppositeInput]: false }))
 
                 if ('errorCode' in result) {
                     setStaticSwapResult(undefined)
@@ -169,39 +176,36 @@ const useStaticSwap = () => {
                     alert('No route found for the selected pair')
                 } else {
                     setStaticSwapResult(result)
-                    setInputValuePair({ ...inputValuePair, [oppositeInput]: result.quote })
+                    setInputValuePair((prev) => ({ ...prev, [oppositeInput]: result.quote }))
 
                     const [quote, base] =
                         swapMetadata.tradeType === TradeType.EXACT_INPUT
-                            ? [result.quote, inputValuePair[InputType.BASE]]
-                            : [inputValuePair[InputType.QUOTE], result.quote]
+                            ? [result.quoteDecimals, getReadableAmount(InputType.BASE)]
+                            : [getReadableAmount(InputType.QUOTE), result.quoteDecimals]
 
                     const gasToPay = computeMaxSpent(result.gasUseEstimate, swapConfigs.gasBuffer)
 
                     setSwapMetadata({
                         tradeType,
                         bestPrice: (parseFloat(quote) / parseFloat(base)).toString(),
-                        minimumReceived: parseReadableAmount(
-                            computeMinReceived(quote, swapConfigs.slippage),
-                            selectedTokenPair[InputType.QUOTE]!.decimals
+                        minimumReceived: computeMinReceivedFloat(quote, swapConfigs.slippage),
+                        maximumSpent: computeMaxSpentFloat(base, swapConfigs.slippage),
+                        gasToPay,
+                        ethFee: parseReadableAmount(
+                            (BigInt(gasToPay) * BigInt(result.gasPriceWei)).toString(),
+                            18
                         ),
-                        maximumSpent: parseReadableAmount(
-                            computeMaxSpent(base, swapConfigs.slippage),
-                            selectedTokenPair[InputType.BASE]!.decimals
-                        ),
-                        gasToPay: gasToPay.toString(),
-                        gweiFee: parseReadableAmount(
-                            (BigInt(gasToPay) * BigInt(staticSwapResult!.gasPriceWei)).toString(),
-                            9
+                        usdFee: computeMaxSpentFloat(
+                            result.gasUseEstimateUSD,
+                            swapConfigs.gasBuffer
                         ),
                     })
                 }
             } catch {
-                setInputValuePair({ ...inputValuePair, [oppositeInput]: '' })
+                setInputValuePair((prev) => ({ ...prev, [oppositeInput]: '' }))
             }
         },
-
-        [selectedTokenPair, inputValuePair]
+        [selectedTokenPair, inputValuePair, swapConfigs]
     )
 
     useEffect(() => {
@@ -210,7 +214,17 @@ const useStaticSwap = () => {
                 activeInput === InputType.BASE ? TradeType.EXACT_INPUT : TradeType.EXACT_OUTPUT
             handleSwap(tradeType, activeInput)
         }
-    }, [selectedTokenPair, inputValuePair, activeInput, swapConfigs])
+    }, [selectedTokenPair, inputValuePair, activeInput])
+
+    useEffect(() => {
+        if (allFilled(selectedTokenPair) && allFilled(inputValuePair) && prevActiveInput.current) {
+            const tradeType =
+                prevActiveInput.current === InputType.BASE
+                    ? TradeType.EXACT_INPUT
+                    : TradeType.EXACT_OUTPUT
+            handleSwap(tradeType, prevActiveInput.current)
+        }
+    }, [swapConfigs])
 
     return {
         // tokens

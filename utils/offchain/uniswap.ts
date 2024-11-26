@@ -12,6 +12,7 @@ import {
 } from '@utils/types'
 import { parseOnChainToken, truncateDecimals } from './tokens'
 import { solidityPacked } from 'ethers'
+import { max } from 'bn.js'
 
 export const formatFee = (fee: number): string => {
     return truncateDecimals(`${fee / 10000}`, 2) + '%'
@@ -77,7 +78,8 @@ export const staticSwap = async (
     valuePair: Pair<string | null>,
     tradeType: TradeType,
     minSplits: number,
-    maxSplits: number
+    maxSplits: number,
+    maxSwapsPerPath: number
 ): Promise<UniswapStaticSwapResponse> => {
     const searchParams: UniswapStaticSwapRequest = {
         protocols: 'v2,v3,mixed',
@@ -91,6 +93,7 @@ export const staticSwap = async (
         ]!.toString(),
         minSplits,
         maxSplits,
+        maxSwapsPerPath,
     }
 
     const response = await fetch(

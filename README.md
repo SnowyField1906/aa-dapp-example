@@ -18,17 +18,18 @@ export interface WalletContext {
 
 - [x] Login + logout
 - [x] Sign transaction
-- [x] 4 swap strategies (i.e. ExactInZeroForOne, ExactOutZeroForOne, ExactInOneForZero, ExactOutOneForZero)
-- [x] Multi hops swap (one route only)
+- [x] 4 swap strategies (i.e. `ExactInZeroForOne`, `ExactOutZeroForOne`, `ExactInOneForZero`, `ExactOutOneForZero`)
+- [x] Multi hops swap
+- [x] Multi routes swap
 - [x] Handle all* wallets + transaction errors (e.g. transaction failures, signing failures, static swap failures)
 - [x] Readable transaction revert messages
-- [ ] Multi routes swap
-- [ ] Settable configs (currently only `slippage` and `gasBuffer` are settable but UI is not implemented)
+- [x] Settable configs (`slippage`, `gasBuffer`, `minSplits`, `maxSplits` and `maxSwapsPerPath`)
 
 ## Acknowledgements (*)
 
-- Current Sepolia RPC is unsable, errors related to the RPC are remaining unhandled (e.g. delayed balances, transaction submission failure)
-- Chaining transaction should be implemented. Otherwise there will be unexpected errors (e.g. approve tokens -> swap, multiple routes swap)
+- (Fixed) Current Sepolia RPC is unsable, errors related to the RPC are remaining unhandled (e.g. delayed balances, transaction submission failure)
+- (Fixed) Chaining transaction should be implemented. Otherwise there will be unexpected errors (e.g. approve tokens -> swap, multiple routes swap)
+- Currently the amount of token to be approved is `uint256.max`. Keeping approving whenever the user swaps the same token is not a good practice to me
 
 ## Sample env
 

@@ -39,12 +39,15 @@ const TokenInput = ({ input }: { input: InputType }) => {
       const readableAmount = getReadableAmount(input)
       setTempAmount(readableAmount)
 
-      await Promise.all([
-        readableAmount && handleUpdateFiatPrice(input, readableAmount),
-        userWallet && handleUpdateBalance(input, userWallet.address),
-      ])
+      if (readableAmount) await handleUpdateFiatPrice(input, readableAmount)
     })()
-  }, [inputValuePair, selectedTokenPair, userWallet])
+  }, [selectedTokenPair, inputValuePair])
+
+  useEffect(() => {
+    ;(async () => {
+      if (userWallet) await handleUpdateBalance(input, userWallet.address)
+    })()
+  }, [selectedTokenPair, userWallet])
 
   return (
     <div className="w-full select-none rounded-lg bg-gray-950 p-3 shadow-md">

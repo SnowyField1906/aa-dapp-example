@@ -89,9 +89,9 @@ const SwapMetadata = () => {
       <div className="flex justify-between pb-4">
         <span className="text-gray-400">Gas Estimated</span>
         <span className="text-white">
-          {truncateDecimals(swapMetadata.gweiFee, 0)}
-          {' Gwei ≈ $'}
-          {truncateDecimals(staticSwapResult.gasUseEstimateUSD, 4)}
+          {truncateDecimals(swapMetadata.ethFee, 4)}
+          {' ETH ≈ $'}
+          {truncateDecimals(swapMetadata.usdFee, 4)}
         </span>
       </div>
 

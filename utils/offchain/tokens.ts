@@ -72,7 +72,14 @@ export const truncateDecimals = (readableAmount: string, decimals: number): stri
     if (!fraction || fraction.slice(0, decimals) === '') {
         return integer
     }
-    return `${integer}.${fraction.slice(0, decimals)}`
+
+    const truncatedFraction = fraction.slice(0, decimals)
+    const trimmedFraction = truncatedFraction.replace(/0+$/, '')
+    if (trimmedFraction === '') {
+        return integer
+    }
+
+    return `${integer}.${trimmedFraction}`
 }
 
 export const getTokenFiatPrice = async (
@@ -97,4 +104,12 @@ export const computeMinReceived = (amountOut: string, slippage: number): string 
 
 export const computeMaxSpent = (amountIn: string, slippage: number): string => {
     return (BigInt(amountIn) + (BigInt(amountIn) * BigInt(slippage)) / BigInt(100)).toString()
+}
+
+export const computeMinReceivedFloat = (amountOut: string, slippage: number): string => {
+    return (parseFloat(amountOut) - parseFloat(amountOut) * (slippage / 100)).toString()
+}
+
+export const computeMaxSpentFloat = (amountIn: string, slippage: number): string => {
+    return (parseFloat(amountIn) + parseFloat(amountIn) * (slippage / 100)).toString()
 }

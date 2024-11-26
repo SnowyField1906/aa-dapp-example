@@ -14,18 +14,12 @@ import { useEffect, useState } from 'react'
 import { ethers } from 'ethers'
 import { EChain, TransactionResponse } from '@aawallet-sdk/types'
 import { computeMaxSpent, computeMinReceived, parseTokenValue } from '@utils/offchain/tokens'
+import UpdateConfigsModal from './UpdateConfigsModal'
 
 const Swap = () => {
   const { userWallet, login, sendTransaction, waitTransaction } = useWalletContext()
-  const {
-    selectedTokenPair,
-    inputValuePair,
-    swapMetadata,
-    swapConfigs,
-    staticSwapResult,
-    handleFlipOrder,
-    handleUpdateBalance,
-  } = useStaticSwapContext()
+  const { swapMetadata, swapConfigs, staticSwapResult, handleFlipOrder, handleUpdateBalance } =
+    useStaticSwapContext()
   const [step, setStep] = useState<
     | 'GUEST'
     | 'INPUT'
@@ -38,6 +32,7 @@ const Swap = () => {
     | 'FAILED'
   >(userWallet ? 'INPUT' : 'GUEST')
   const [hash, setHash] = useState<string>()
+  const [openConfigsModal, setOpenConfigsModal] = useState<boolean>(false)
 
   const executeSwap = async () => {
     setStep('CONFIRMING_APPROVE')
@@ -138,8 +133,6 @@ const Swap = () => {
     ])
   }
 
-  const isFinalStep = step === 'CANCELED' || step === 'SUCCESS' || step === 'FAILED'
-
   useEffect(() => {
     setStep('INPUT')
     setHash(undefined)
@@ -150,54 +143,60 @@ const Swap = () => {
   }, [userWallet])
 
   return (
-    <div className="w-2xl w-2xl mx-auto flex flex-col gap-6 rounded-lg bg-gray-900 p-6 text-white shadow-lg">
-      <FaCog className="ml-auto cursor-pointer text-gray-400" />
-
-      <hr className="border-gray-700" />
-
-      <TokenInput input={InputType.BASE} />
-
-      <div className="flex items-center justify-center">
-        <FaExchangeAlt
-          className="rotate-90 transform cursor-pointer text-gray-400"
-          onClick={handleFlipOrder}
+    <>
+      {openConfigsModal && <UpdateConfigsModal onClose={() => setOpenConfigsModal(false)} />}
+      <div className="w-2xl w-2xl mx-auto flex flex-col gap-6 rounded-lg bg-gray-900 p-6 text-white shadow-lg">
+        <FaCog
+          className="ml-auto cursor-pointer text-gray-400"
+          onClick={() => setOpenConfigsModal(true)}
         />
-      </div>
 
-      <TokenInput input={InputType.QUOTE} />
+        <hr className="border-gray-700" />
 
-      <SwapMetadata />
+        <TokenInput input={InputType.BASE} />
 
-      <button
-        className="w-full rounded-lg bg-blue-600 py-3 font-semibold text-white hover:bg-blue-700 disabled:pointer-events-none disabled:opacity-50"
-        disabled={step !== 'INPUT'}
-        onClick={step === 'GUEST' ? login : executeSwap}
-      >
-        {
-          {
-            GUEST: 'Connect Wallet',
-            INPUT: 'Swap',
-            CONFIRMING_APPROVE: 'Confirming for approval',
-            CONFIRMING_SWAP: 'Confirming for swap',
-            CANCELED: 'Canceled',
-            APPROVING: 'Approving token',
-            SWAPPING: 'Executing swap',
-            SUCCESS: 'Success',
-            FAILED: 'Failed',
-          }[step]
-        }
-      </button>
-      {hash && (
-        <a
-          href={`https://sepolia.etherscan.io/tx/${hash}`}
-          target="_blank "
-          rel="noreferrer"
-          className="text-center text-sm text-blue-400 underline"
+        <div className="flex items-center justify-center">
+          <FaExchangeAlt
+            className="rotate-90 transform cursor-pointer text-gray-400"
+            onClick={handleFlipOrder}
+          />
+        </div>
+
+        <TokenInput input={InputType.QUOTE} />
+
+        <SwapMetadata />
+
+        <button
+          className="w-full rounded-lg bg-blue-600 py-3 font-semibold text-white hover:bg-blue-700 disabled:pointer-events-none disabled:opacity-50"
+          disabled={step !== 'INPUT'}
+          onClick={step === 'GUEST' ? login : executeSwap}
         >
-          View transaction status on Etherscan
-        </a>
-      )}
-    </div>
+          {
+            {
+              GUEST: 'Connect Wallet',
+              INPUT: 'Swap',
+              CONFIRMING_APPROVE: 'Confirming for approval',
+              CONFIRMING_SWAP: 'Confirming for swap',
+              CANCELED: 'Canceled',
+              APPROVING: 'Approving token',
+              SWAPPING: 'Executing swap',
+              SUCCESS: 'Success',
+              FAILED: 'Failed',
+            }[step]
+          }
+        </button>
+        {hash && (
+          <a
+            href={`https://sepolia.etherscan.io/tx/${hash}`}
+            target="_blank "
+            rel="noreferrer"
+            className="text-center text-sm text-blue-400 underline"
+          >
+            View transaction status on Etherscan
+          </a>
+        )}
+      </div>
+    </>
   )
 }
 
