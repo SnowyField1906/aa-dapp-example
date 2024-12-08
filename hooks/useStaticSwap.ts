@@ -5,6 +5,7 @@ import {
     computeMinReceivedFloat,
     getTokenFiatPrice,
     getTokenList,
+    isNativeToken,
     parseOnChainTokenPair,
     parseReadableAmount,
     parseTokenValue,
@@ -21,7 +22,7 @@ import {
 } from '@utils/types'
 import { TradeType } from '@uniswap/sdk-core'
 import { allFilled, oppositeOf, someFilled, unwrapPair } from '@utils/offchain/base'
-import { getBalance } from '@utils/onchain/tokens'
+import { getBalance, getNativeBalance } from '@utils/onchain/tokens'
 import { staticSwap } from '@utils/offchain/uniswap'
 
 const useStaticSwap = () => {
@@ -126,7 +127,9 @@ const useStaticSwap = () => {
     }
     const handleUpdateBalance = async (input: InputType, address: string) => {
         try {
-            const r = await getBalance(selectedTokenPair[input]!.address, address)
+            const r = isNativeToken(selectedTokenPair[input]!)
+                ? await getNativeBalance(address)
+                : await getBalance(selectedTokenPair[input]!.address, address)
             setBalancePair((prev) => ({ ...prev, [input]: r }))
         } catch {
             setBalancePair((prev) => ({ ...prev, [input]: '' }))

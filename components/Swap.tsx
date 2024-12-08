@@ -13,19 +13,31 @@ import { constructPath } from '@utils/offchain/uniswap'
 import { useEffect, useState } from 'react'
 import { ethers } from 'ethers'
 import { EChain, TransactionResponse } from '@aawallet-sdk/types'
-import { computeMaxSpent, computeMinReceived, parseTokenValue } from '@utils/offchain/tokens'
+import {
+  computeMaxSpent,
+  computeMinReceived,
+  isNativeToken,
+  parseTokenValue,
+} from '@utils/offchain/tokens'
 import UpdateConfigsModal from './UpdateConfigsModal'
 
 const Swap = () => {
   const { userWallet, login, sendTransaction, waitTransaction } = useWalletContext()
-  const { swapMetadata, swapConfigs, staticSwapResult, handleFlipOrder, handleUpdateBalance } =
-    useStaticSwapContext()
+  const {
+    selectedTokenPair,
+    inputValuePair,
+    swapMetadata,
+    swapConfigs,
+    staticSwapResult,
+    handleFlipOrder,
+    handleUpdateBalance,
+  } = useStaticSwapContext()
   const [step, setStep] = useState<
     | 'GUEST'
     | 'INPUT'
     | 'CONFIRMING_APPROVE'
     | 'CONFIRMING_SWAP'
-    | 'CANCELED'
+    | 'CANCELLED'
     | 'APPROVING'
     | 'SWAPPING'
     | 'SUCCESS'
@@ -79,24 +91,52 @@ const Swap = () => {
 
     for (const route of staticSwapResult!.route) {
       const path = constructPath(route, swapMetadata.tradeType)
-      const [tokenIn, tokenOut] = route.reduce(
-        (acc, hop) => [acc[0] + BigInt(hop.amountIn), acc[1] + BigInt(hop.amountOut)],
+      const [amountIn, amountOut] = route.reduce(
+        (acc, hop) => [acc[0] + BigInt(hop.amountIn ?? '0'), acc[1] + BigInt(hop.amountOut ?? '0')],
         [BigInt(0), BigInt(0)]
       )
 
-      if (swapMetadata.tradeType === TradeType.EXACT_INPUT) {
-        const exactIn = tokenIn.toString()
-        const minReceived = computeMinReceived(tokenOut.toString(), swapConfigs.slippage)
+      const recipient =
+        route.length > 1 ? '0x0000000000000000000000000000000000000002' : userWallet!.address
 
-        const args = [path, userWallet!.address, exactIn, minReceived]
+      if (swapMetadata.tradeType === TradeType.EXACT_INPUT) {
+        const exactIn = amountIn.toString()
+        const minReceived = computeMinReceived(amountOut.toString(), swapConfigs.slippage)
+        const args = [path, recipient, exactIn, minReceived]
         calls.push(contractInterface.encodeFunctionData('exactInput', [args]))
       } else {
-        const exactOut = tokenOut.toString()
-        const maxSpent = computeMaxSpent(tokenIn.toString(), swapConfigs.slippage)
-
-        const args = [path, userWallet!.address, exactOut.toString(), maxSpent.toString()]
+        const exactOut = amountOut.toString()
+        const maxSpent = computeMaxSpent(amountIn.toString(), swapConfigs.slippage)
+        const args = [path, recipient, exactOut, maxSpent]
         calls.push(contractInterface.encodeFunctionData('exactOutput', [args]))
       }
+    }
+
+    let value = '0'
+
+    // if pay ETH, set a appropriate amount of value
+    if (isNativeToken(selectedTokenPair[InputType.BASE]!)) {
+      const amount =
+        swapMetadata.tradeType === TradeType.EXACT_INPUT
+          ? inputValuePair[InputType.BASE]
+          : parseTokenValue(swapMetadata.maximumSpent, selectedTokenPair[InputType.BASE]!.decimals)
+
+      value = amount
+      calls.push(contractInterface.encodeFunctionData('refundETH', []))
+    }
+
+    // if receive ETH, unwrap WETH after finishing swap
+    if (isNativeToken(selectedTokenPair[InputType.QUOTE]!)) {
+      const amount =
+        swapMetadata.tradeType === TradeType.EXACT_OUTPUT
+          ? inputValuePair[InputType.QUOTE]
+          : parseTokenValue(
+              swapMetadata.minimumReceived,
+              selectedTokenPair[InputType.QUOTE]!.decimals
+            )
+
+      const args = [amount]
+      calls.push(contractInterface.encodeFunctionData('unwrapWETH9(uint256)', args))
     }
 
     /// Execute multi-call
@@ -104,8 +144,8 @@ const Swap = () => {
       from: userWallet!.address,
       to: ROUTER_ADDRESS,
       gasLimit: swapMetadata.gasToPay,
-      value: '0',
       data: contractInterface.encodeFunctionData('multicall(bytes[])', [calls]),
+      value,
     })) as TransactionResponse<EChain.ETHEREUM>
 
     console.log('Transaction response: ', response)
@@ -125,7 +165,7 @@ const Swap = () => {
       }
     } else {
       alert(`Signing failed with reason: ${response.error.message}`)
-      setStep('CANCELED')
+      setStep('CANCELLED')
     }
     await Promise.all([
       handleUpdateBalance(InputType.BASE, userWallet!.address),
@@ -134,7 +174,7 @@ const Swap = () => {
   }
 
   useEffect(() => {
-    setStep('INPUT')
+    setStep(userWallet ? 'INPUT' : 'GUEST')
     setHash(undefined)
   }, [staticSwapResult])
   useEffect(() => {
@@ -177,7 +217,7 @@ const Swap = () => {
               INPUT: 'Swap',
               CONFIRMING_APPROVE: 'Confirming for approval',
               CONFIRMING_SWAP: 'Confirming for swap',
-              CANCELED: 'Canceled',
+              CANCELLED: 'Cancelled',
               APPROVING: 'Approving token',
               SWAPPING: 'Executing swap',
               SUCCESS: 'Success',

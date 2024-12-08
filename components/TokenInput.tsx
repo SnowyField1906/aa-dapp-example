@@ -101,7 +101,7 @@ const TokenInput = ({ input }: { input: InputType }) => {
             .filter((token) => token.symbol !== selectedTokenPair[oppositeOf(input)]?.symbol)
             .map((token) => (
               <div
-                key={token.address}
+                key={token.symbol}
                 className="flex cursor-pointer items-center p-3 hover:bg-gray-700"
                 onClick={() => handleTokenChange(token)}
               >

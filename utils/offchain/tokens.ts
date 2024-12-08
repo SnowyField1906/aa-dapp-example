@@ -1,16 +1,24 @@
 'use client'
 
 import { CHAIN_ID } from '../constants'
-import { InputType, OffChainToken, OnchainToken, Pair, UniswapStaticToken } from '../types'
+import { InputType, OffChainToken, OnchainToken, Pair, PairOpt, UniswapStaticToken } from '../types'
 import { Token } from '@uniswap/sdk-core'
 import defaultTokenList from '@uniswap/default-token-list'
 import additionalTokenList from './additional_token_list.json'
 
 export const getTokenList = async (chainId: number = CHAIN_ID): Promise<OffChainToken[]> => {
-    //   const response = await fetch('https://ipfs.io/ipns/tokens.uniswap.org');
-    //   const tokenList = await response.json();
+    /// alternative approach (suggested)
+    /// const response = await fetch('https://ipfs.io/ipns/tokens.uniswap.org');
+    /// const tokenList = await response.json();
+
+    /// filter tokens by chainId
     const filtered = defaultTokenList.tokens.filter((token) => token.chainId === chainId)
-    return [...filtered, ...additionalTokenList]
+
+    /// add native token to the list by modifying the wrapped token
+    const wrappedToken = filtered.find((token) => token.symbol === 'WETH')
+    const nativeToken = { ...wrappedToken, symbol: 'ETH' } as OffChainToken
+
+    return [nativeToken, ...filtered, ...additionalTokenList]
 }
 
 export const parseOnChainToken = (t: OffChainToken | UniswapStaticToken): OnchainToken => {
@@ -21,6 +29,10 @@ export const parseOnChainTokenPair = (pair: Pair<OffChainToken>): Pair<OnchainTo
         [InputType.BASE]: parseOnChainToken(pair[InputType.BASE]),
         [InputType.QUOTE]: parseOnChainToken(pair[InputType.QUOTE]),
     }
+}
+
+export const isNativeToken = (token: OffChainToken): boolean => {
+    return token.symbol === 'ETH'
 }
 
 export const certificatedLogoUri = (uri: string): string => {
@@ -36,7 +48,6 @@ export const parseTokenValue = (amount: string, decimals: number): string => {
     const separator = amount.indexOf('.') !== -1 ? '.' : ','
     let [integer, fraction] = amount.split(separator)
     const integerPart = BigInt(integer)
-    const fractionPart = BigInt(fraction || '0')
 
     if (!fraction) {
         return (integerPart * BigInt(10 ** decimals)).toString()
@@ -45,6 +56,7 @@ export const parseTokenValue = (amount: string, decimals: number): string => {
         fraction = fraction.slice(0, decimals)
     }
 
+    const fractionPart = BigInt(fraction)
     const fractionMultiplier = BigInt(10 ** (decimals - fraction.length))
     return (integerPart * BigInt(10 ** decimals) + fractionPart * fractionMultiplier).toString()
 }
