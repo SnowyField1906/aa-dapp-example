@@ -2,21 +2,21 @@
 
 import '@styles/globals.css'
 import { WalletProvider } from '@aawallet-sdk'
-import { EChain } from '@aawallet-sdk/types'
 import StaticSwapProvider from '@providers/StaticSwapProvider'
+import { Network } from '@aawallet-sdk/types'
 
 export default function RootLayout({
-	children,
+  children,
 }: Readonly<{
-	children: React.ReactNode
+  children: React.ReactNode
 }>) {
-	return (
-		<html lang="en">
-			<body>
-				<WalletProvider chain={EChain.ETHEREUM}>
-					<StaticSwapProvider>{children}</StaticSwapProvider>
-				</WalletProvider>
-			</body>
-		</html>
-	)
+  return (
+    <html lang="en">
+      <body>
+        <WalletProvider network={Network.TETHSPL}>
+          <StaticSwapProvider>{children}</StaticSwapProvider>
+        </WalletProvider>
+      </body>
+    </html>
+  )
 }

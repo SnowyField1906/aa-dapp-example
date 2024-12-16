@@ -12,7 +12,13 @@ import { TradeType } from '@uniswap/sdk-core'
 import { constructPath } from '@utils/offchain/uniswap'
 import { useEffect, useState } from 'react'
 import { ethers } from 'ethers'
-import { EChain, TransactionResponse } from '@aawallet-sdk/types'
+import {
+  Network,
+  ResponseCode,
+  Result,
+  TransactionReceipt,
+  TransactionResponse,
+} from '@aawallet-sdk/types'
 import {
   computeMaxSpent,
   computeMinReceived,
@@ -20,9 +26,10 @@ import {
   parseTokenValue,
 } from '@utils/offchain/tokens'
 import UpdateConfigsModal from './UpdateConfigsModal'
+import { set } from '@coral-xyz/anchor/dist/cjs/utils/features'
 
 const Swap = () => {
-  const { userWallet, login, sendTransaction, waitTransaction } = useWalletContext()
+  const { address, login, sendTransaction, waitTransaction } = useWalletContext()
   const {
     selectedTokenPair,
     inputValuePair,
@@ -42,7 +49,7 @@ const Swap = () => {
     | 'SWAPPING'
     | 'SUCCESS'
     | 'FAILED'
-  >(userWallet ? 'INPUT' : 'GUEST')
+  >(address ? 'INPUT' : 'GUEST')
   const [hash, setHash] = useState<string>()
   const [openConfigsModal, setOpenConfigsModal] = useState<boolean>(false)
 
@@ -55,21 +62,21 @@ const Swap = () => {
       new Set(hops.map((hop) => [hop.tokenIn.address, hop.tokenOut.address]).flat())
     )
     const approvalsNeeded: Address[] = await Promise.all(
-      uniqueAddresses.map((address) =>
-        getAllowance(address, userWallet!.address, ROUTER_ADDRESS).then((allowance) =>
+      uniqueAddresses.map((erc20Address) =>
+        getAllowance(erc20Address, address!, ROUTER_ADDRESS).then((allowance) =>
           allowance === '0' ? address : ''
         )
       )
-    ).then((addresses) => addresses.filter((address) => address !== ''))
+    ).then((res) => res.filter((e) => e !== '') as Address[])
 
     /// Approve all tokens
     let approved = true
-    for (const address of approvalsNeeded) {
+    for (const erc20Address of approvalsNeeded) {
       const contractInterface = new ethers.Interface(I_ERC20_ABI)
       const data = contractInterface.encodeFunctionData('approve', [ROUTER_ADDRESS, MAX_UINT256])
       await sendTransaction({
-        from: userWallet!.address,
-        to: address,
+        from: address,
+        to: erc20Address,
         gasLimit: '100000',
         value: '0',
         data,
@@ -96,8 +103,7 @@ const Swap = () => {
         [BigInt(0), BigInt(0)]
       )
 
-      const recipient =
-        route.length > 1 ? '0x0000000000000000000000000000000000000002' : userWallet!.address
+      const recipient = route.length > 1 ? '0x0000000000000000000000000000000000000002' : address
 
       if (swapMetadata.tradeType === TradeType.EXACT_INPUT) {
         const exactIn = amountIn.toString()
@@ -130,10 +136,7 @@ const Swap = () => {
       const amount =
         swapMetadata.tradeType === TradeType.EXACT_OUTPUT
           ? inputValuePair[InputType.QUOTE]
-          : parseTokenValue(
-              swapMetadata.minimumReceived,
-              selectedTokenPair[InputType.QUOTE]!.decimals
-            )
+          : parseTokenValue(swapMetadata.minimumReceived, selectedTokenPair[InputType.QUOTE]!.decimals)
 
       const args = [amount]
       calls.push(contractInterface.encodeFunctionData('unwrapWETH9(uint256)', args))
@@ -141,46 +144,48 @@ const Swap = () => {
 
     /// Execute multi-call
     const response = (await sendTransaction({
-      from: userWallet!.address,
+      from: address,
       to: ROUTER_ADDRESS,
       gasLimit: swapMetadata.gasToPay,
       data: contractInterface.encodeFunctionData('multicall(bytes[])', [calls]),
       value,
-    })) as TransactionResponse<EChain.ETHEREUM>
+    })) as Result<TransactionResponse<Network.ETH>>
 
-    console.log('Transaction response: ', response)
+    console.log('Transaction response:', response)
 
-    if (response.success) {
-      setStep('SWAPPING')
-      setHash(response.signed.hash)
-      const receipt = await waitTransaction(response.signed.hash)
+    if (response.code === ResponseCode.SUCCESS) {
+      setHash(response.result!.hash)
 
-      console.log('Transaction receipt: ', receipt)
+      const receipt = (await waitTransaction(response.result!.hash)) as Result<
+        TransactionReceipt<Network.ETH>
+      >
 
-      if (receipt.success) {
+      console.log('Transaction receipt:', receipt)
+
+      if (receipt.code === ResponseCode.SUCCESS) {
         setStep('SUCCESS')
       } else {
-        alert(`Transaction failed with reason: ${receipt.error.message}`)
+        alert(`Transaction failed with reason: ${receipt.message}`)
         setStep('FAILED')
       }
     } else {
-      alert(`Signing failed with reason: ${response.error.message}`)
+      alert(`Signing failed with reason: ${response.message}`)
       setStep('CANCELLED')
     }
     await Promise.all([
-      handleUpdateBalance(InputType.BASE, userWallet!.address),
-      handleUpdateBalance(InputType.QUOTE, userWallet!.address),
+      handleUpdateBalance(InputType.BASE, address!),
+      handleUpdateBalance(InputType.QUOTE, address!),
     ])
   }
 
   useEffect(() => {
-    setStep(userWallet ? 'INPUT' : 'GUEST')
+    setStep(address ? 'INPUT' : 'GUEST')
     setHash(undefined)
   }, [staticSwapResult])
   useEffect(() => {
-    setStep(userWallet ? 'INPUT' : 'GUEST')
+    setStep(address ? 'INPUT' : 'GUEST')
     setHash(undefined)
-  }, [userWallet])
+  }, [address])
 
   return (
     <>

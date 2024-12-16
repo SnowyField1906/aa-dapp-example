@@ -1,27 +1,31 @@
 import { useState, useCallback, useRef } from 'react'
 import {
-    EChain,
-    PublicUserWallet,
+    Network,
     TransactionReceipt,
     TransactionRequest,
     TransactionResponse,
+    Result,
+    MessageType,
+    MessageRequest,
+    Payload,
+    ResponseCode,
+    MessageResponse,
 } from '../types'
 import { PROVIDER } from '@utils/constants'
 import { getRevertReason } from '@utils/offchain/transaction'
+import { Address } from '@utils/types'
 
 const TARGET_WALLET = process.env.NEXT_PUBLIC_TARGET_WALLET as string
+const TARGET_WALLET_ORIGIN = new URL(TARGET_WALLET).origin
 
-const useWallet = (chain: EChain) => {
-    type Chain = typeof chain
-    type UserWallet = PublicUserWallet<Chain>
-    type TxResponse = TransactionResponse<Chain>
-    type TxReceipt = TransactionReceipt<Chain>
-    type TxRequest = TransactionRequest<Chain>
-
-    const [userWallet, setUserWallet] = useState<UserWallet>()
+const useWallet = (network: Network) => {
+    const [address, setAddress] = useState<Address>()
     const [isProcessing, setIsProcessing] = useState(false)
-    const transactionQueue = useRef<
-        { transaction: () => Promise<TxResponse>; resolve: (value: TxResponse) => void }[]
+    const txQueue = useRef<
+        {
+            tx: () => Promise<Result<TransactionResponse>>
+            resolve: (value: Result<TransactionResponse>) => void
+        }[]
     >([])
 
     const _popup = (): Window => {
@@ -33,18 +37,25 @@ const useWallet = (chain: EChain) => {
         return popup
     }
 
+    const _buildRequest = <T extends MessageType>(
+        type: T,
+        payload?: Payload<Network, T>['Request']
+    ): MessageRequest<Network, T> => {
+        return { type, network, payload }
+    }
+
     const _processQueue = useCallback(async () => {
-        if (isProcessing || transactionQueue.current.length === 0) return
+        if (isProcessing || txQueue.current.length === 0) return
 
         setIsProcessing(true)
         try {
-            while (transactionQueue.current.length > 0) {
-                const current = transactionQueue.current[0]
+            while (txQueue.current.length > 0) {
+                const current = txQueue.current[0]
                 if (!current) break
 
-                const result = await current.transaction()
+                const result: Result<TransactionResponse> = await current.tx()
                 current.resolve(result)
-                transactionQueue.current.shift()
+                txQueue.current.shift()
             }
         } finally {
             setIsProcessing(false)
@@ -52,9 +63,9 @@ const useWallet = (chain: EChain) => {
     }, [isProcessing])
 
     const _queueTransaction = useCallback(
-        (transaction: () => Promise<TxResponse>): Promise<TxResponse> => {
+        (tx: () => Promise<Result<TransactionResponse>>): Promise<Result<TransactionResponse>> => {
             return new Promise((resolve) => {
-                transactionQueue.current.push({ transaction, resolve })
+                txQueue.current.push({ tx, resolve })
                 _processQueue()
             })
         },
@@ -62,31 +73,29 @@ const useWallet = (chain: EChain) => {
     )
 
     const _handleSendTransaction = useCallback(
-        async (payload: TxRequest): Promise<TxResponse> => {
-            if (!userWallet) {
-                return { success: false, error: new Error('User wallet not found') }
+        async (payload: TransactionRequest): Promise<Result<TransactionResponse>> => {
+            if (!address) {
+                return { code: ResponseCode.ERROR, message: 'User wallet not found' }
             }
 
             return new Promise((resolve) => {
                 const walletWindow: Window = _popup()
 
-                const handleMessage = ({ data: { type, ...res } }: MessageEvent) => {
-                    if (type === 'READY') {
-                        walletWindow.postMessage(
-                            { type: 'SIGN_TRANSACTION_REQUEST', payload, userWallet },
-                            '*'
-                        )
+                const handleMessage = ({ data, origin }: MessageEvent<MessageResponse>) => {
+                    if (data.type === ('READY' as any) && origin === TARGET_WALLET_ORIGIN) {
+                        const request = _buildRequest('SIGN_TRANSACTION', payload)
+                        walletWindow.postMessage(request, TARGET_WALLET)
                     }
-                    if (type === 'SIGN_TRANSACTION_RESPONSE') {
+                    if (data.type === 'SIGN_TRANSACTION' && origin === TARGET_WALLET_ORIGIN) {
                         cleanup()
                         walletWindow.close()
-                        resolve(res)
+                        resolve(data.payload as Result<TransactionResponse>)
                     }
                 }
 
                 const handleClose = () => {
                     cleanup()
-                    resolve({ success: false, error: new Error('User closed window') })
+                    resolve({ code: ResponseCode.ERROR, message: 'User unexpectedly closed the wallet' })
                 }
 
                 const cleanup = () => {
@@ -101,18 +110,19 @@ const useWallet = (chain: EChain) => {
                 window.addEventListener('message', handleMessage)
             })
         },
-        [userWallet]
+        [address]
     )
 
     const login = useCallback(() => {
         const walletWindow = _popup()
 
-        const handleMessage = ({ data: { type, ...res } }: MessageEvent) => {
-            if (type === 'READY') {
-                walletWindow.postMessage({ type: 'DERIVE_ADDRESS_REQUEST', chain }, '*')
+        const handleMessage = ({ data: { type, payload }, origin }: MessageEvent) => {
+            if (type === 'READY' && origin === TARGET_WALLET_ORIGIN) {
+                const request = _buildRequest('CONNECT_WALLET')
+                walletWindow.postMessage(request, TARGET_WALLET)
             }
-            if (type === 'DERIVE_ADDRESS_RESPONSE') {
-                setUserWallet(res)
+            if (type === 'CONNECT_WALLET' && origin === TARGET_WALLET_ORIGIN) {
+                setAddress(payload.result)
                 walletWindow.close()
             }
         }
@@ -122,36 +132,30 @@ const useWallet = (chain: EChain) => {
     }, [])
 
     const logout = () => {
-        setUserWallet(undefined)
+        setAddress(undefined)
     }
 
     const sendTransaction = useCallback(
-        async (payload: TxRequest): Promise<TxResponse> =>
+        async (payload: TransactionRequest): Promise<Result<TransactionResponse>> =>
             _queueTransaction(() => _handleSendTransaction(payload)),
         [_queueTransaction, _handleSendTransaction]
     )
 
     const waitTransaction = useCallback(
-        async (payload: string): Promise<TxReceipt> =>
+        async (payload: string): Promise<Result<TransactionReceipt>> =>
             new Promise(async (resolve) => {
-                const receipt = (await PROVIDER.waitForTransaction(payload))!
-                if (receipt.status === 0) {
-                    const reason = await getRevertReason(receipt.hash)
-                    resolve({ success: false, error: new Error(reason) })
+                const result: TransactionReceipt = (await PROVIDER.waitForTransaction(payload))!
+                if (result.status === 0) {
+                    const message = await getRevertReason(result.hash)
+                    resolve({ code: ResponseCode.ERROR, message })
                 } else {
-                    resolve({ success: true, receipt })
+                    resolve({ code: ResponseCode.SUCCESS, message: 'Transaction confirmed', result })
                 }
             }),
         []
     )
 
-    return {
-        userWallet,
-        login,
-        logout,
-        sendTransaction,
-        waitTransaction,
-    }
+    return { address, login, logout, sendTransaction, waitTransaction }
 }
 
 export default useWallet

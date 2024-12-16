@@ -8,7 +8,7 @@ import { useStaticSwapContext } from '@providers/StaticSwapProvider'
 import { oppositeOf } from '@utils/offchain/base'
 
 const TokenInput = ({ input }: { input: InputType }) => {
-  const { userWallet } = useWalletContext()
+  const { address } = useWalletContext()
   const {
     tokenList,
     getReadableAmount,
@@ -45,9 +45,9 @@ const TokenInput = ({ input }: { input: InputType }) => {
 
   useEffect(() => {
     ;(async () => {
-      if (userWallet) await handleUpdateBalance(input, userWallet.address)
+      if (address) await handleUpdateBalance(input, address)
     })()
-  }, [selectedTokenPair, userWallet])
+  }, [selectedTokenPair, address])
 
   return (
     <div className="w-full select-none rounded-lg bg-gray-950 p-3 shadow-md">

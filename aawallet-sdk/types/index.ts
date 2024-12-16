@@ -1,72 +1,81 @@
-import {
-	Transaction as SolanaTransactionRequest,
-	TransactionResponse as SolanaTransactionResponse,
-} from '@solana/web3.js'
-import {
-	TransactionRequest as EthereumTransactionRequest,
-	TransactionResponse as EthereumTransactionResponse,
-	TransactionReceipt as EthereumTransactionReceipt,
-} from 'ethers'
+import solana from '@solana/web3.js'
+import * as ethers from 'ethers'
 
-export enum EChain {
-	ETHEREUM = 'ETHEREUM',
-	SOLANA = 'SOLANA',
+export enum Network {
+    ETH = 1,
+    TETHSPL = 11155111,
+    SOLANA = 101,
+}
+export enum ResponseCode {
+    SUCCESS = 0,
+    ERROR = 1,
 }
 
-export type TransactionRequest<T extends EChain = EChain> =
-	T extends EChain.ETHEREUM
-		? EthereumTransactionRequest
-		: T extends EChain.SOLANA
-			? SolanaTransactionRequest
-			: never
-
-export type TransferNativePayload = {
-	recipient: string
-	amount: string
-}
-export type TransferTokenPayload = {
-	recipient: string
-	amount: string
-	tokenAddress: string
+export type MessageType = (typeof MESSAGE_TYPES)[number]
+export type Result<T> = {
+    code: ResponseCode
+    message: string
+    result?: T
 }
 
-export type TransactionResponse<T extends EChain = EChain> =
-	| {
-			success: true
-			signed: T extends EChain.ETHEREUM
-				? EthereumTransactionResponse
-				: T extends EChain.SOLANA
-					? string // ? SolanaTransactionResponse
-					: never
-	  }
-	| { success: false; error: Error }
+/// Transaction Mappings
 
-export type TransactionReceipt<T extends EChain = EChain> =
-	| {
-			success: true
-			receipt: T extends EChain.ETHEREUM
-				? EthereumTransactionReceipt
-				: T extends EChain.SOLANA
-					? SolanaTransactionResponse
-					: never
-	  }
-	| { success: false; error: Error }
+export type EthereumMapping = {
+    Request: ethers.TransactionRequest
+    Response: ethers.TransactionResponse
+    Receipt: ethers.TransactionReceipt
+}
+export type SolanaMapping = {
+    Request: solana.Transaction
+    Response: solana.TransactionResponse
+    Receipt: solana.TransactionResponse
+}
+export type Transaction<N extends Network = Network> = {
+    [Network.ETH]: EthereumMapping
+    [Network.TETHSPL]: EthereumMapping
+    [Network.SOLANA]: SolanaMapping
+}[N]
 
-export type PublicUserWallet<T extends EChain = EChain> = {
-	address: string
-	chain: T
+/// Transaction Interfaces
+
+export type TransactionRequest<N extends Network = Network> = Transaction<N>['Request']
+export type TransactionResponse<N extends Network = Network> = Transaction<N>['Response']
+export type TransactionReceipt<N extends Network = Network> = Transaction<N>['Receipt']
+
+/// Message Mappings
+
+export type ConnectWalletMapping = {
+    Request: undefined
+    Response: string
+}
+export type SignTransactionMapping<N extends Network = Network> = {
+    Request: TransactionRequest<N>
+    Response: TransactionResponse<N>
+}
+export type Payload<N extends Network = Network, T extends MessageType = MessageType> = {
+    ['SIGN_TRANSACTION']: SignTransactionMapping<N>
+    ['CONNECT_WALLET']: ConnectWalletMapping
+}[T]
+
+/// Message Interfaces
+
+export type MessageRequest<N extends Network = Network, T extends MessageType = MessageType> = {
+    type: T
+    network: N
+    payload: Payload<N, T>['Request']
+}
+export type MessageResponse<N extends Network = Network, T extends MessageType = MessageType> = {
+    type: T
+    network: N
+    payload: Result<Payload<N, T>['Response']>
 }
 
-export type PostMessageData<T extends EChain = EChain> =
-	PostMessageRequest<T> & {
-		origin: string
-	}
-export type PostMessageRequest<T extends EChain = EChain> = {
-	type:
-		| 'DERIVE_ADDRESS_REQUEST'
-		| 'SIGN_TRANSACTION_REQUEST'
-		| 'TRANSFER_TOKEN_REQUEST'
-		| 'TRANSFER_NATIVE_REQUEST'
-	payload?: TransactionRequest<T>
-	userWallet?: PublicUserWallet<T>
+/// Constants
+
+export const MESSAGE_TYPES = ['SIGN_TRANSACTION', 'CONNECT_WALLET'] as const
+
+export const NETWORK_DETAILS = {
+    [Network.ETH]: { name: 'Ethereum Mainnet' },
+    [Network.TETHSPL]: { name: 'Ethereum Sepolia (Testnet)' },
+    [Network.SOLANA]: { name: 'Solana Mainnet' },
 }

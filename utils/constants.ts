@@ -6,6 +6,7 @@ export const BASE_URL = 'http://localhost:4000'
 export const RPC_URL = 'https://ethereum-sepolia-rpc.publicnode.com'
 export const PROVIDER = new JsonRpcProvider(RPC_URL)
 export const CHAIN_ID = 11155111
+
 export const ROUTER_ADDRESS: Address = '0x3bFA4769FB09eefC5a80d6E87c3B9C650f7Ae48E'
 export const FACTORY_ADDRESS: Address = '0x0227628f3F023bb0B980b67D528571c95c6DaC1c'
 export { abi as I_POOL_ABI } from '@uniswap/v3-core/artifacts/contracts/interfaces/IUniswapV3Pool.sol/IUniswapV3Pool.json'
